@@ -96,8 +96,12 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
+        "core.permissions.HasTenantPermission",
     ),
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "core.schema.TenantAutoSchema",
+    "DEFAULT_THROTTLE_RATES": {
+        "password_reset": env("PASSWORD_RESET_THROTTLE_RATE", default="5/hour"),
+    },
 }
 
 SIMPLE_JWT = {
@@ -111,6 +115,18 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Beauty Business Manager API",
     "DESCRIPTION": "Multi-tenant SaaS API for beauty and cosmetics retailers.",
     "VERSION": "0.1.0",
+    # Docs are only routed when DEBUG is on (config/urls.py).
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_AUTHENTICATION": [],
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "TAGS": [
+        {"name": "auth", "description": "Registration, login, token rotation, current user."},
+        {"name": "password reset", "description": "FR-4 single-use, time-limited reset tokens."},
+        {"name": "settings", "description": "Per-business configuration."},
+    ],
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
@@ -129,5 +145,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 MAILERS = {
     "default": {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
+        # When switching to SMTP, read credentials from env with REPLACE_ME
+        # placeholders in .env, never literal values here.
     },
 }
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@bbm.local")
+
+# FR-4 password reset
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=30 * 60)  # seconds
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")

@@ -4,7 +4,16 @@ from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 
 from core.admin import TenantModelAdmin
 
-from .models import Business, BusinessSettings, Role, User, UserRole
+from .models import (
+    Business,
+    BusinessSettings,
+    Permission,
+    PasswordResetToken,
+    Role,
+    RolePermission,
+    User,
+    UserRole,
+)
 
 
 class EmailUserCreationForm(AdminUserCreationForm):
@@ -55,6 +64,38 @@ class BusinessAdmin(admin.ModelAdmin):
 @admin.register(Role)
 class RoleAdmin(TenantModelAdmin):
     list_display = ("name", "business", "is_system")
+
+
+@admin.register(Permission)
+class PermissionAdmin(admin.ModelAdmin):
+    """The catalog is maintained in accounts.rbac plus data migrations."""
+
+    list_display = ("codename", "description")
+    search_fields = ("codename",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RolePermission)
+class RolePermissionAdmin(TenantModelAdmin):
+    list_display = ("role", "permission", "business")
+    list_select_related = ("role", "permission", "business")
+
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ("user", "created_at", "expires_at", "used_at")
+    readonly_fields = ("user", "token_hash", "expires_at", "used_at")
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(UserRole)

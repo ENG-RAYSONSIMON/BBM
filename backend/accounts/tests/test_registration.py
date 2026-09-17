@@ -5,7 +5,7 @@ from django.urls import reverse_lazy
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
-from accounts.models import Business, BusinessSettings, Role, User, UserRole
+from accounts.models import Business, BusinessSettings, Role, RolePermission, User, UserRole
 from accounts.services import register_owner
 from core.tenancy import tenant_context
 
@@ -31,7 +31,7 @@ class RegisterEndpointTests(APITestCase):
         self.assertEqual(business.currency, "TZS")
         self.assertTrue(user.password.startswith("argon2"))
         with tenant_context(business):
-            role = Role.objects.get()
+            role = Role.objects.get(name=Role.OWNER)
             membership = UserRole.objects.get()
             self.assertTrue(BusinessSettings.objects.exists())
         self.assertEqual((role.name, role.is_system), (Role.OWNER, True))
@@ -73,5 +73,6 @@ class RegisterOwnerTransactionTests(TestCase):
         self.assertFalse(User.objects.exists())
         self.assertFalse(Business.objects.exists())
         self.assertFalse(Role.all_objects.exists())
+        self.assertFalse(RolePermission.all_objects.exists())
         self.assertFalse(UserRole.all_objects.exists())
         self.assertFalse(BusinessSettings.all_objects.exists())

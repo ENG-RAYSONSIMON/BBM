@@ -47,12 +47,31 @@ class Business(UUIDModel, TimeStampedModel):
         return self.name
 
 
+class Permission(UUIDModel, TimeStampedModel):
+    """FR-5 permission catalog. Global: codenames are defined in code
+    (accounts.rbac) and mean the same thing in every business. Which roles
+    hold them is tenant data, in RolePermission."""
+
+    codename = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ("codename",)
+
+    def __str__(self):
+        return self.codename
+
+
 class Role(TenantModel):
     OWNER = "Owner"
+    ADMIN = "Admin"
 
     name = models.CharField(max_length=50)
     is_system = models.BooleanField(
         default=False, help_text="System roles (e.g. Owner) cannot be renamed or removed."
+    )
+    permissions = models.ManyToManyField(
+        Permission, through="RolePermission", related_name="roles"
     )
 
     class Meta(TenantModel.Meta):
@@ -92,6 +111,30 @@ class UserRole(TenantModel):
         super().save(*args, **kwargs)
 
 
+class RolePermission(TenantModel):
+    """Grants a permission to one business's role. Access checks read these
+    rows; they never look at role names."""
+
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name="grants")
+    permission = models.ForeignKey(Permission, on_delete=models.PROTECT, related_name="grants")
+
+    class Meta(TenantModel.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "permission"], name="accounts_rolepermission_unique_grant"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.role} — {self.permission}"
+
+    def save(self, *args, **kwargs):
+        self.assign_business()
+        if str(self.role.business_id) != str(self.business_id):
+            raise TenantMismatch("RolePermission.role belongs to a different business.")
+        super().save(*args, **kwargs)
+
+
 class BusinessSettings(TenantModel):
     """Per-business configuration; exactly one row per business."""
 
@@ -111,3 +154,21 @@ class BusinessSettings(TenantModel):
 
     def __str__(self):
         return f"Settings for {self.business_id}"
+
+
+class PasswordResetToken(UUIDModel, TimeStampedModel):
+    """FR-4 single-use reset token. Not tenant-scoped (users are global).
+    Only the SHA-256 of the raw token is stored."""
+
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="password_reset_tokens"
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "used_at"], name="pwreset_user_used_idx")]
+
+    def __str__(self):
+        return f"Reset token for {self.user_id}"

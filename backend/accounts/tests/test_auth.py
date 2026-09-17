@@ -42,7 +42,7 @@ class LoginTests(APITestCase):
     def test_several_memberships_require_a_business_choice(self):
         _, other = make_owner("other@example.com", "Shop B")
         with tenant_context(other):
-            UserRole.objects.create(user=self.user, role=Role.objects.create(name="Admin"))
+            UserRole.objects.create(user=self.user, role=Role.objects.get(name=Role.ADMIN))
 
         unchosen = self.login()
         self.assertEqual(unchosen.status_code, 400)

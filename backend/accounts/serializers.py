@@ -12,13 +12,21 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.tenancy import TENANT_CLAIM
 
-from .models import Business, User
-from .services import get_active_membership, get_active_memberships, register_owner
+from .models import Business, BusinessSettings, User
+from .services import (
+    InvalidResetToken,
+    confirm_password_reset,
+    get_active_membership,
+    get_active_memberships,
+    register_owner,
+    request_password_reset,
+)
 from .tokens import tokens_for
 
 INVALID_CREDENTIALS = _("No active account found with the given credentials.")
 DUPLICATE_EMAIL = _("A user with this email already exists.")
 NO_ACTIVE_MEMBERSHIP = _("No active business membership for this token.")
+INVALID_RESET_TOKEN = _("Reset link is invalid or expired.")
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -33,6 +41,29 @@ class BusinessSerializer(serializers.ModelSerializer):
         model = Business
         fields = ("id", "name", "tin", "phone", "email", "address", "currency")
         read_only_fields = fields
+
+
+class AuthPayloadSerializer(serializers.Serializer):
+    """Response of register and login (documentation only)."""
+
+    refresh = serializers.CharField()
+    access = serializers.CharField()
+    user = UserSerializer()
+    business = BusinessSerializer()
+    role = serializers.CharField()
+
+
+class MeSerializer(serializers.Serializer):
+    """Response of /auth/me/ (documentation only)."""
+
+    user = UserSerializer()
+    business = BusinessSerializer()
+    role = serializers.CharField()
+    permissions = serializers.ListField(child=serializers.CharField())
+
+
+class DetailSerializer(serializers.Serializer):
+    detail = serializers.CharField()
 
 
 def auth_payload(user, business, role_name):
@@ -153,3 +184,37 @@ class LogoutSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         self._token.blacklist()
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+    def save(self, **kwargs):
+        request_password_reset(self.validated_data["email"])
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=128, trim_whitespace=True)
+    new_password = serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}
+    )
+
+    def save(self, **kwargs):
+        try:
+            return confirm_password_reset(
+                self.validated_data["token"], self.validated_data["new_password"]
+            )
+        except InvalidResetToken:
+            raise serializers.ValidationError({"token": [INVALID_RESET_TOKEN]})
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"new_password": list(exc.messages)})
+
+
+class BusinessSettingsSerializer(serializers.ModelSerializer):
+    tax_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=0, max_value=100
+    )
+
+    class Meta:
+        model = BusinessSettings
+        fields = ("low_stock_threshold", "expiry_warning_days", "tax_rate", "loyalty_enabled")

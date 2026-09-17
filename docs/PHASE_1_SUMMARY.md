@@ -1,11 +1,11 @@
 # Phase 1 — Identity & Tenant Core
 
-Covers **FR-1** (atomic registration), **FR-2** (JWT with rotating refresh) and
-**FR-3** (central tenant scoping) from `docs/BBM_SRS_Summary_Draft.pdf` (v0.2).
+Covers **FR-1** (atomic registration), **FR-2** (JWT with rotating refresh),
+**FR-3** (central tenant scoping), **FR-4** (password reset) and **FR-5**
+(table-driven permissions) from `docs/BBM_SRS_Summary_Draft.pdf` (v0.2).
 
-Status as of 2026-09-15: implemented. `python manage.py test` runs 24 tests,
-all passing. `manage.py check` is clean and all migrations are applied. Nothing
-is committed yet.
+Status as of 2026-09-17: implemented. `python manage.py test` runs 53 tests,
+all passing. FR-4 and FR-5 are described in §7 and §8; OpenAPI docs in §6.
 
 ---
 
@@ -14,7 +14,7 @@ is committed yet.
 | App | Holds |
 |---|---|
 | `core` | Tenancy plumbing, not tied to a domain: abstract base models, tenant manager, tenant context (ContextVar), JWT authentication class, request middleware, admin base class. It has no concrete models and no migrations. |
-| `accounts` | Identity and tenant models (`User`, `Business`, `Role`, `UserRole`, `BusinessSettings`), registration service, token helper, auth endpoints. |
+| `accounts` | Identity and tenant models (`User`, `Business`, `Role`, `UserRole`, `BusinessSettings`, `Permission`, `RolePermission`, `PasswordResetToken`), registration/RBAC/reset services, permission catalog (`rbac.py`), token helper, auth and settings endpoints. |
 
 `core/views.py` is still the empty `startapp` stub.
 
@@ -68,7 +68,8 @@ Changes from Django's default user:
 | `name` | max 50; unique per business (`accounts_role_unique_name_per_business`) |
 | `is_system` | default `False`; the Owner role created at registration has `True` |
 
-Constant `Role.OWNER = "Owner"`.
+Constants `Role.OWNER = "Owner"`, `Role.ADMIN = "Admin"` (used only for
+seeding, never for access decisions — see §8).
 
 ### `UserRole` (`accounts.UserRole`) — `TenantModel`
 
@@ -137,7 +138,8 @@ Request: `email`, `password`, `business_name` (required); `first_name`,
   `password`.
 - It calls `accounts.services.register_owner()`, which is `@transaction.atomic`
   and creates, in order: User → Business → (inside `tenant_context(business)`)
-  Owner `Role` (`is_system=True`) → `UserRole` → `BusinessSettings`.
+  `seed_default_roles()` (Owner and Admin roles, `is_system=True`, with their
+  default `RolePermission` grants) → owner's `UserRole` → `BusinessSettings`.
 - **201** body: `{refresh, access, user{id,email,first_name,last_name,phone},
   business{id,name,tin,phone,email,address,currency}, role: "Owner"}`. The new
   owner is logged in immediately.
@@ -176,7 +178,9 @@ valid **and belong to the authenticated user**; otherwise the response is 400
 
 ### `GET /auth/me/`
 
-Returns `{user, business, role}` for the business named in the token.
+Returns `{user, business, role, permissions}` for the business named in the
+token. `permissions` is the sorted list of codenames the role holds (for UI
+gating only; the backend enforces them independently).
 
 ### Token settings (`SIMPLE_JWT`)
 
@@ -309,7 +313,17 @@ Don't add one.
 from the SRS row `roles / permissions / user_roles` also carry Django's app
 prefix: `accounts_role`, `accounts_userrole`, and so on.
 
-**Related difference:** the SRS lists "currency" under settings. It is actually
+### Deviation 4 — Global permission catalog
+
+**SRS §5:** `roles / permissions / user_roles` are all marked tenant-scoped.
+
+**Built:** `accounts.Permission` (the list of codenames) is global, because
+codenames are defined in code and mean the same thing in every business.
+The tenant-scoped part is `accounts.RolePermission` (which role in which
+business holds which permission), a `TenantModel`. Roles and user roles stay
+tenant-scoped as before.
+
+**Related difference (Deviation 3):** the SRS lists "currency" under settings. It is actually
 stored as `Business.currency`, and `BusinessSettings` has no currency field.
 
 ---
@@ -347,12 +361,8 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       `tenant_context()`. The ContextVar doesn't carry into tasks.
 
 ### Other Phase 1 items in the SRS that are not built
-- [ ] **FR-4, password reset** (Phase 1, High): not started. Email is only
-      configured as a console backend (`MAILERS` in settings).
-- [ ] **FR-5, table-driven permissions** (Phase 1, High): not started. There is
-      no `permissions` table, only the Owner role is created, there is no Admin
-      role seed, and no view checks roles. The only permission in use is
-      `IsAuthenticated`.
+- [x] **FR-4, password reset** — see §7.
+- [x] **FR-5, table-driven permissions** — see §8.
 - [ ] No staff/membership management endpoints (inviting an Admin, changing a
       role, deactivating a member). `UserRole.is_active` can only be toggled
       from Django admin.
@@ -360,13 +370,13 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       real dashboard". The frontend isn't started.
 
 ### API docs / tooling
-- [ ] **OpenAPI is not reachable.** `drf_spectacular` is installed and set as
-      `DEFAULT_SCHEMA_CLASS`, but `config/urls.py` routes no schema, Swagger or
-      Redoc views. Running `manage.py spectacular` currently reports:
-      - an error: `MeView` is a plain `APIView` with no serializer, so it is
-        left out of the schema;
-      - 2 warnings: no `OpenApiAuthenticationExtension` for
-        `TenantJWTAuthentication`, so Bearer auth isn't documented.
+- [x] **OpenAPI docs.** Swagger UI `/api/docs/`, ReDoc `/api/redoc/`, schema
+      `/api/schema/`, routed only when `DEBUG=True`. `core/schema.py` adds the
+      `TenantJWTAuthentication` bearer scheme (`jwtAuth`) and
+      `TenantAutoSchema`, which documents each view's `required_permissions`
+      (description note + `x-required-permissions`). `manage.py spectacular
+      --validate --fail-on-warn` is clean; `accounts/tests/test_schema.py`
+      fails on any schema warning or error and checks the DEBUG-only routing.
 - [ ] There is no `.env.example` for `./.env` or `./backend/.env`.
 - [ ] No CI (NFR-11).
 - [ ] `docker-compose.yml` has no `frontend` or `nginx` services, and no db
@@ -376,3 +386,106 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       constraint, so two unique indexes. The case-insensitive one is enough.
 - [ ] Minor: `UserRole.save()` with no `role` set raises
       `RelatedObjectDoesNotExist` rather than a clean validation error.
+
+---
+
+## 7. FR-4 — Password reset
+
+### Model: `accounts.PasswordResetToken` (not tenant-scoped; users are global)
+| Field | Notes |
+|---|---|
+| `user` | FK → User, CASCADE |
+| `token_hash` | SHA-256 hex of the raw token, unique. The raw token is never stored. |
+| `expires_at` | creation + `PASSWORD_RESET_TIMEOUT` (default 1800 s) |
+| `used_at` | set on use, or when a newer request / completed reset makes it obsolete |
+
+### Endpoints (no authentication, `ScopedRateThrottle` scope `password_reset`, default `5/hour` per IP)
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/v1/auth/password-reset/` | `email` | always **202** with the same body |
+| POST | `/api/v1/auth/password-reset/confirm/` | `token`, `new_password` | **204**; **400** `token` (same text for unknown/used/expired/inactive user); **400** `new_password` for validator failures (token stays usable) |
+
+### Flow (`accounts/services.py`)
+- `request_password_reset(email)`: an active user with that email (case-insensitive)
+  gets their unused tokens revoked and a new `secrets.token_urlsafe(32)` token.
+  The email is sent on commit, with link `{FRONTEND_URL}/reset-password#token=<raw>`
+  (fragment keeps it out of server logs and Referer). Unknown or inactive
+  email: nothing happens.
+- `confirm_password_reset(token, new_password)`: atomic, `select_for_update` on
+  the token row; validates the password against the user; sets it; marks every
+  unused token for the user as used; blacklists every outstanding refresh
+  token for the user (all sessions end).
+
+### Settings
+`PASSWORD_RESET_TIMEOUT`, `FRONTEND_URL`, `DEFAULT_FROM_EMAIL`,
+`PASSWORD_RESET_THROTTLE_RATE` — all env-overridable, none secret.
+
+### Known gaps
+- [ ] Access tokens remain valid for up to 20 minutes after a reset (stateless).
+- [ ] Response time differs slightly when the account exists (DB write + mail
+      send in the request). Moves off-request with Celery in Phase 4.
+- [ ] Throttling uses the default LocMem cache: per-process, reset on restart.
+      Point `CACHES` at Redis before running more than one worker.
+- [ ] Used/expired token rows are never deleted; add to the same cron as
+      `flushexpiredtokens`.
+- [ ] Real SMTP not configured. When it is, credentials come from env with
+      `REPLACE_ME` placeholders, never literals in settings.
+
+## 8. FR-5 — Table-driven permissions
+
+### Schema
+`User → UserRole (per business) → Role → RolePermission → Permission`
+
+| Model | Scope | Notes |
+|---|---|---|
+| `Permission` | global | `codename` unique (e.g. `settings.manage`), `description`. Read-only in admin. |
+| `RolePermission` | `TenantModel` | `role` FK CASCADE, `permission` FK PROTECT; unique `(role, permission)`; `save()` raises `TenantMismatch` if the role belongs to another business |
+| `Role.permissions` | — | M2M through `RolePermission` |
+
+### Catalog and defaults (`accounts/rbac.py`)
+| Codename | Owner | Admin |
+|---|---|---|
+| `settings.view` | ✓ | ✓ |
+| `settings.manage` | ✓ | |
+
+Migration `0003_seed_permissions` inserts the catalog and backfills existing
+businesses (creates their Admin role, grants defaults). It uses literal
+codenames so later catalog edits don't change it.
+
+**Adding a permission:** add it to `PERMISSIONS` and `DEFAULT_ROLE_PERMISSIONS`,
+then write a data migration inserting the catalog row and granting it to
+existing businesses' roles. `seed_default_roles()` raises if a default
+codename is missing from the catalog table.
+
+**Adding a role (e.g. Cashier):** create the `Role` and its `RolePermission`
+rows. No code changes; covered by `test_new_role_needs_no_code_change`.
+
+### Enforcement (`core/permissions.py::HasTenantPermission`)
+- In `DEFAULT_PERMISSION_CLASSES` after `IsAuthenticated`.
+- Views declare `required_permissions`: a tuple (all methods) or a dict of
+  HTTP method → tuple. HEAD uses GET's entry.
+- Fails closed: undeclared view → `ImproperlyConfigured` (500, programming
+  error); method not in the dict → 403; no `request.membership` → 403.
+- Grants come from `get_permission_codenames(membership)`, which reads
+  `RolePermission` through the tenant-scoped manager and caches on the
+  membership for the request (one extra query on protected requests).
+  Permissions are not in the JWT, so role changes apply on the next request.
+- Views with their own `permission_classes` (register, login, refresh,
+  password reset) are unaffected. `MeView` and `LogoutView` declare `()`.
+
+### Endpoint: `/api/v1/settings/` (`accounts:settings`)
+| Method | Needs | Notes |
+|---|---|---|
+| GET | `settings.view` | the active business's `BusinessSettings` row |
+| PATCH | `settings.manage` | `low_stock_threshold`, `expiry_warning_days`, `tax_rate` (0–100), `loyalty_enabled`; unknown fields (e.g. `business`) are ignored |
+
+No id in the URL: the row is found via the tenant-scoped manager.
+
+### Known gaps
+- [ ] No API to manage roles or grants yet (Django admin only). When one is
+      built it needs a no-escalation rule: a caller may only assign roles or
+      grants that are a subset of their own permissions.
+- [ ] `Role.is_system` is still not enforced (see §6); deleting a system role's
+      grants in admin takes effect immediately.
+- [ ] Only settings permissions exist. Each later phase adds its codenames
+      (products, sales, audit log, …) with a data migration.
