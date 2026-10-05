@@ -36,12 +36,14 @@ class RegisterView(generics.GenericAPIView):
     serializer_class = RegisterSerializer
     authentication_classes = ()
     permission_classes = (AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "register"
 
     @extend_schema(
         tags=["auth"],
         summary="Register an owner and their business",
         auth=[],
-        responses={201: AuthPayloadSerializer, 400: VALIDATION_ERROR},
+        responses={201: AuthPayloadSerializer, 400: VALIDATION_ERROR, 429: THROTTLED},
     )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -52,6 +54,8 @@ class RegisterView(generics.GenericAPIView):
 
 class LoginView(TokenViewBase):
     serializer_class = LoginSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "login"
 
     @extend_schema(
         tags=["auth"],
@@ -67,6 +71,7 @@ class LoginView(TokenViewBase):
                 description="Several businesses and none chosen, or not a member of `business_id`."
             ),
             401: OpenApiResponse(description="Invalid credentials or no active membership."),
+            429: THROTTLED,
         },
     )
     def post(self, request, *args, **kwargs):
@@ -75,12 +80,19 @@ class LoginView(TokenViewBase):
 
 class RefreshView(TokenRefreshView):
     serializer_class = TenantTokenRefreshSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "token_refresh"
 
     @extend_schema(
         tags=["auth"],
         summary="Rotate a refresh token",
         description="Returns a new access/refresh pair; the submitted refresh token stops working.",
         auth=[],
+        responses={
+            200: TenantTokenRefreshSerializer,
+            401: OpenApiResponse(description="Refresh token invalid, revoked, or membership inactive."),
+            429: THROTTLED,
+        },
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)

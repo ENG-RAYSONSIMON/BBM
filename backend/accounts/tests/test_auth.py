@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.urls import reverse_lazy
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
@@ -18,6 +19,7 @@ class LoginTests(APITestCase):
     url = reverse_lazy("accounts:login")
 
     def setUp(self):
+        cache.clear()  # throttle counters live in the cache
         self.user, self.business = make_owner("owner@example.com", "Shop A")
 
     def login(self, **overrides):
@@ -66,6 +68,7 @@ class RefreshTests(APITestCase):
     url = reverse_lazy("accounts:refresh")
 
     def setUp(self):
+        cache.clear()  # throttle counters live in the cache
         self.user, self.business = make_owner("owner@example.com", "Shop A")
         self.refresh = tokens_for(self.user, self.business)["refresh"]
 

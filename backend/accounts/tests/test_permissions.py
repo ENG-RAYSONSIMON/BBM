@@ -1,10 +1,19 @@
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from django.urls import reverse_lazy
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 from rest_framework.views import APIView
 
-from accounts.models import BusinessSettings, Permission, Role, RolePermission, User, UserRole
+from accounts.models import (
+    BusinessSettings,
+    Permission,
+    ProtectedRoleError,
+    Role,
+    RolePermission,
+    User,
+    UserRole,
+)
 from accounts.rbac import PERMISSIONS, SETTINGS_MANAGE, SETTINGS_VIEW
 from accounts.services import register_owner
 from accounts.tokens import tokens_for
@@ -148,6 +157,48 @@ class PermissionTests(APITestCase):
 
     def test_unauthenticated_settings_request_is_401(self):
         self.assertEqual(self.client.get(self.settings_url).status_code, 401)
+
+    def test_system_roles_cannot_be_renamed_or_unmarked(self):
+        with tenant_context(self.business):
+            owner_role = Role.objects.get(name=Role.OWNER)
+            owner_role.name = "Boss"
+            with self.assertRaises(ProtectedRoleError):
+                owner_role.save()
+
+            owner_role.refresh_from_db()
+            owner_role.is_system = False
+            with self.assertRaises(ProtectedRoleError):
+                owner_role.save()
+
+    # Deletes send pre_delete inside atomic(savepoint=False), so each expected
+    # failure gets its own savepoint to keep the test transaction usable.
+
+    def test_system_roles_cannot_be_deleted(self):
+        with tenant_context(self.business):
+            UserRole.objects.all().delete()  # memberships PROTECT their role
+            with self.assertRaises(ProtectedRoleError), transaction.atomic():
+                self.admin_role.delete()
+            with self.assertRaises(ProtectedRoleError), transaction.atomic():
+                Role.objects.filter(is_system=True).delete()
+            self.assertEqual(Role.objects.filter(is_system=True).count(), 2)
+
+    def test_owner_grants_cannot_be_removed(self):
+        with tenant_context(self.business):
+            grants = RolePermission.objects.filter(role__name=Role.OWNER)
+            with self.assertRaises(ProtectedRoleError), transaction.atomic():
+                grants.first().delete()
+            with self.assertRaises(ProtectedRoleError), transaction.atomic():
+                grants.delete()
+            self.assertEqual(grants.count(), len(PERMISSIONS))
+
+    def test_custom_roles_can_be_renamed_and_deleted(self):
+        with tenant_context(self.business):
+            role = Role.objects.create(name="Cashier")
+            self.grant(role, SETTINGS_VIEW)
+            role.name = "Till"
+            role.save()
+            role.delete()
+            self.assertFalse(Role.objects.filter(name__in=["Cashier", "Till"]).exists())
 
 
 class UndeclaredView(APIView):

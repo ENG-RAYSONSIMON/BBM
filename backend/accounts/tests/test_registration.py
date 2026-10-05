@@ -1,5 +1,6 @@
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse_lazy
 from rest_framework.test import APITestCase
@@ -20,6 +21,9 @@ PAYLOAD = {
 
 class RegisterEndpointTests(APITestCase):
     url = reverse_lazy("accounts:register")
+
+    def setUp(self):
+        cache.clear()  # throttle counters live in the cache
 
     def test_creates_user_business_owner_role_and_settings(self):
         response = self.client.post(self.url, PAYLOAD, format="json")

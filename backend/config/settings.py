@@ -72,6 +72,24 @@ DATABASES = {
 }
 
 
+# Cache (throttle counters). Redis is shared by all workers and survives
+# restarts; production must set REDIS_URL. Without it, fall back to a
+# per-process LocMem cache so manage.py still runs outside Docker.
+REDIS_URL = env("REDIS_URL", default="")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "bbm",
+        },
+    }
+else:
+    CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    }
+
+
 # Password validation + hashing
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -99,8 +117,14 @@ REST_FRAMEWORK = {
         "core.permissions.HasTenantPermission",
     ),
     "DEFAULT_SCHEMA_CLASS": "core.schema.TenantAutoSchema",
+    # NFR-3. Counters are per client IP and live in CACHES["default"]. Once
+    # nginx sits in front, set NUM_PROXIES so the real client IP is used
+    # instead of the proxy's.
     "DEFAULT_THROTTLE_RATES": {
         "password_reset": env("PASSWORD_RESET_THROTTLE_RATE", default="5/hour"),
+        "register": env("REGISTER_THROTTLE_RATE", default="5/hour"),
+        "login": env("LOGIN_THROTTLE_RATE", default="10/min"),
+        "token_refresh": env("TOKEN_REFRESH_THROTTLE_RATE", default="30/min"),
     },
 }
 

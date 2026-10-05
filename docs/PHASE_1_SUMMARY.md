@@ -4,8 +4,8 @@ Covers **FR-1** (atomic registration), **FR-2** (JWT with rotating refresh),
 **FR-3** (central tenant scoping), **FR-4** (password reset) and **FR-5**
 (table-driven permissions) from `docs/BBM_SRS_Summary_Draft.pdf` (v0.2).
 
-Status as of 2026-09-17: implemented. `python manage.py test` runs 53 tests,
-all passing. FR-4 and FR-5 are described in §7 and §8; OpenAPI docs in §6.
+Status as of 2026-10-05: implemented, frontend included. `python manage.py test`
+runs 61 tests, all passing; the frontend has 16 Vitest tests. FR-4 and FR-5 are described in §7 and §8; OpenAPI docs in §6.
 
 ---
 
@@ -66,7 +66,7 @@ Changes from Django's default user:
 | Field | Notes |
 |---|---|
 | `name` | max 50; unique per business (`accounts_role_unique_name_per_business`) |
-| `is_system` | default `False`; the Owner role created at registration has `True` |
+| `is_system` | default `False`; the Owner and Admin roles seeded at registration have `True`. A system role can't be renamed, un-marked or deleted, and the Owner role's grants can't be removed. Raises `ProtectedRoleError`; deletes are guarded with `pre_delete`, so QuerySet deletes and cascades are covered too. |
 
 Constants `Role.OWNER = "Owner"`, `Role.ADMIN = "Admin"` (used only for
 seeding, never for access decisions — see §8).
@@ -331,16 +331,16 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
 ## 6. Open TODOs and known gaps
 
 ### Against FR-1 (registration)
-- [ ] `Role.is_system` help text says system roles "cannot be renamed or
-      removed", but **nothing enforces it**: no `save`/`delete` guard and no
-      constraint. It only works today because no endpoint edits roles.
+- [x] `Role.is_system` is enforced (see §2 `Role`). Remaining hole:
+      `QuerySet.update(name=...)` bypasses the `save()` check.
 - [ ] `Business` has no `logo` field (the SRS lists one under businesses). This
       probably belongs with FR-10/NFR-5 upload validation in Phase 2.
-- [ ] `/auth/register/` has no rate limiting (NFR-3).
+- [x] `/auth/register/` is rate limited (scope `register`, `5/hour`).
 
 ### Against FR-2 (tokens)
-- [ ] No throttling on `/auth/login/` or `/auth/refresh/` (NFR-3). DRF
-      `DEFAULT_THROTTLE_*` isn't configured.
+- [x] `/auth/login/` (scope `login`, `10/min`) and `/auth/refresh/` (scope
+      `token_refresh`, `30/min`) are rate limited per IP. Rates are overridable
+      via env (see `backend/.env.example`). Behind nginx, set DRF `NUM_PROXIES`.
 - [ ] Outstanding and blacklisted token rows grow without limit. Nothing runs
       SimpleJWT's `flushexpiredtokens` yet; it needs a cron/management-command
       schedule before Phase 4 Celery.
@@ -366,8 +366,9 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
 - [ ] No staff/membership management endpoints (inviting an Admin, changing a
       role, deactivating a member). `UserRole.is_active` can only be toggled
       from Django admin.
-- [ ] SRS Appendix A says Phase 1 ends when the owner can "land on an empty but
-      real dashboard". The frontend isn't started.
+- [x] Frontend (`frontend/`): register, login (business picker), forgot/reset
+      password, dashboard with empty states, settings. Access token in memory,
+      refresh token in `localStorage`.
 
 ### API docs / tooling
 - [x] **OpenAPI docs.** Swagger UI `/api/docs/`, ReDoc `/api/redoc/`, schema
@@ -377,9 +378,9 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       (description note + `x-required-permissions`). `manage.py spectacular
       --validate --fail-on-warn` is clean; `accounts/tests/test_schema.py`
       fails on any schema warning or error and checks the DEBUG-only routing.
-- [ ] There is no `.env.example` for `./.env` or `./backend/.env`.
+- [x] `.env.example` and `backend/.env.example` exist (`REPLACE_ME` placeholders).
 - [ ] No CI (NFR-11).
-- [ ] `docker-compose.yml` has no `frontend` or `nginx` services, and no db
+- [ ] `docker-compose.yml` has a dev `frontend` service but no `nginx`, and no db
       healthcheck (`depends_on` is start order only). The backend runs Django's
       `runserver`.
 - [ ] Minor: `User.email` has both `unique=True` and the `Lower(email)` unique
@@ -424,8 +425,8 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
 - [ ] Access tokens remain valid for up to 20 minutes after a reset (stateless).
 - [ ] Response time differs slightly when the account exists (DB write + mail
       send in the request). Moves off-request with Celery in Phase 4.
-- [ ] Throttling uses the default LocMem cache: per-process, reset on restart.
-      Point `CACHES` at Redis before running more than one worker.
+- [x] Throttle counters live in Redis when `REDIS_URL` is set (LocMem
+      fallback otherwise, per-process).
 - [ ] Used/expired token rows are never deleted; add to the same cron as
       `flushexpiredtokens`.
 - [ ] Real SMTP not configured. When it is, credentials come from env with
@@ -485,7 +486,6 @@ No id in the URL: the row is found via the tenant-scoped manager.
 - [ ] No API to manage roles or grants yet (Django admin only). When one is
       built it needs a no-escalation rule: a caller may only assign roles or
       grants that are a subset of their own permissions.
-- [ ] `Role.is_system` is still not enforced (see §6); deleting a system role's
-      grants in admin takes effect immediately.
+- [x] `Role.is_system` is enforced, and Owner grants can't be removed (§2).
 - [ ] Only settings permissions exist. Each later phase adds its codenames
       (products, sales, audit log, …) with a data migration.

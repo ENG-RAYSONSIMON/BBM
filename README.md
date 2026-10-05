@@ -12,7 +12,7 @@ profit reports.
 
 ## Current state / next step
 
-**Done: Phase 1, Identity & Tenant Core (FR-1 to FR-5).** Backend only.
+**Done: Phase 1, Identity & Tenant Core (FR-1 to FR-5)**, backend and frontend.
 - Email/password registration creates User + Business + Owner and Admin roles
   (with default permissions) + owner membership + settings in a single atomic
   transaction.
@@ -28,6 +28,12 @@ profit reports.
   `core.permissions.HasTenantPermission` is a default permission class; every
   authenticated view declares `required_permissions`. Owner and Admin differ
   only by table rows, so a new role (e.g. Cashier) needs no code change.
+- Rate limiting (NFR-3) on register, login, refresh and password reset, with
+  counters in Redis. System roles can't be renamed or deleted, and the Owner
+  role's grants can't be removed.
+- Frontend (`frontend/`, React + Vite): register, login (with a business picker
+  for multi-business accounts), forgot/reset password, a dashboard with
+  empty states, and business settings (editable with `settings.manage`).
 - OpenAPI schema with Swagger UI and ReDoc (development only; see §6).
 - 53 tests, all passing. The FR-4/FR-5 and OpenAPI changes are not committed yet.
 
@@ -87,17 +93,24 @@ gitignored if you keep one for editor tooling.)
 | Service | Image / build | Host port |
 |---|---|---|
 | `db` | `postgres:15` (named volume `pgdata`) | `5433` → 5432 |
-| `redis` | `redis:7` (nothing uses it yet) | `6379` |
+| `redis` | `redis:7` (throttle counters, via `REDIS_URL`) | `6379` |
 | `backend` | `./backend` (Python 3.12, Django 6.1, DRF, SimpleJWT, drf-spectacular), `runserver` with `./backend` mounted at `/app` | `8000` |
 
-`frontend` and `nginx` aren't in `docker-compose.yml` yet.
+| `frontend` | `node:24-alpine`, Vite dev server with `./frontend` mounted (`npm ci` on start) | `5173` |
+
+`nginx` isn't in `docker-compose.yml` yet.
 
 ---
 
 ## 1. Environment files
 
-There are two env files, both gitignored. There's no `.env.example` yet, so
-create them by hand.
+There are two env files, both gitignored. Copy the examples and fill in every
+`REPLACE_ME`:
+
+```bash
+cp .env.example .env
+cp backend/.env.example backend/.env
+```
 
 **`./.env`**: read by `docker compose` to configure the `db` container.
 
@@ -116,11 +129,15 @@ DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 DATABASE_URL=postgres://<POSTGRES_USER>:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>
 CORS_ALLOWED_ORIGINS=http://localhost:5173
+REDIS_URL=redis://redis:6379/0               # throttle counters; LocMem if unset
 
 # Optional (defaults shown). None of these are secrets.
 # FRONTEND_URL=http://localhost:5173        # base of the password-reset link
 # PASSWORD_RESET_TIMEOUT=1800               # reset token lifetime, seconds
 # PASSWORD_RESET_THROTTLE_RATE=5/hour       # per IP, both reset endpoints
+# LOGIN_THROTTLE_RATE=10/min                # per IP
+# REGISTER_THROTTLE_RATE=5/hour             # per IP
+# TOKEN_REFRESH_THROTTLE_RATE=30/min        # per IP
 # DEFAULT_FROM_EMAIL=no-reply@bbm.local
 ```
 
@@ -182,7 +199,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (53 tests)
+docker compose exec backend python manage.py test            # whole suite (61 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -190,6 +207,14 @@ docker compose exec backend python manage.py test accounts.tests.test_password_r
 docker compose exec backend python manage.py test accounts.tests.test_permissions
 docker compose exec backend python manage.py test accounts.tests.test_schema
 docker compose exec backend python manage.py check
+```
+
+Frontend (from `frontend/`, after `npm install`):
+
+```bash
+npm test            # Vitest: API client, login, register, reset token, app shell, theme
+npm run lint        # oxlint
+npm run build       # type-check + production build
 ```
 
 If the backend container isn't running, replace `exec backend` with
@@ -296,14 +321,14 @@ docker compose exec backend python manage.py spectacular --validate --fail-on-wa
 ```
 BBM/
 ├── docker-compose.yml
-├── .env                      # compose vars (gitignored)
+├── .env                      # compose vars (gitignored; see .env.example)
 ├── docs/
 │   ├── BBM_SRS_Summary_Draft.pdf
 │   └── PHASE_1_SUMMARY.md
 └── backend/
     ├── Dockerfile
     ├── requirements.txt
-    ├── .env                  # Django vars (gitignored)
+    ├── .env                  # Django vars (gitignored; see .env.example)
     ├── config/               # settings, root urls (API docs routes when DEBUG)
     ├── core/                 # tenancy: TenantModel, TenantManager, tenant context,
     │                         #   TenantJWTAuthentication, HasTenantPermission,
@@ -313,4 +338,10 @@ BBM/
                               #   rbac.py (permission catalog + role defaults);
                               #   register/login/refresh/logout/me, password reset,
                               #   settings
+frontend/
+├── src/lib/                  # api.ts (fetch + token refresh), auth.tsx / auth-context.ts,
+│                             #   schemas.ts (Zod), forms.ts, types.ts
+├── src/pages/                # login, register, forgot/reset password, dashboard, settings
+├── src/components/           # layout (app shell, auth layout), shadcn/ui in ui/
+└── src/routes/guards.tsx     # RequireAuth / RedirectIfAuthed
 ```

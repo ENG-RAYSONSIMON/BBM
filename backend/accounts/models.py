@@ -1,6 +1,9 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 
 from core.models import TenantModel, TimeStampedModel, UUIDModel
 from core.tenancy import TenantMismatch
@@ -62,6 +65,11 @@ class Permission(UUIDModel, TimeStampedModel):
         return self.codename
 
 
+class ProtectedRoleError(ValidationError):
+    """A change that would rename or remove a system role, or strip a grant
+    from the Owner role."""
+
+
 class Role(TenantModel):
     OWNER = "Owner"
     ADMIN = "Admin"
@@ -83,6 +91,19 @@ class Role(TenantModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # QuerySet.update() bypasses this check, like the other tenant
+        # guards on save(); code review is the guard there.
+        if not self._state.adding:
+            stored = (
+                Role.all_objects.filter(pk=self.pk).values("name", "is_system").first()
+            )
+            if stored and stored["is_system"] and (
+                stored["name"] != self.name or not self.is_system
+            ):
+                raise ProtectedRoleError("System roles cannot be renamed or made non-system.")
+        super().save(*args, **kwargs)
 
 
 class UserRole(TenantModel):
@@ -172,3 +193,22 @@ class PasswordResetToken(UUIDModel, TimeStampedModel):
 
     def __str__(self):
         return f"Reset token for {self.user_id}"
+
+
+# Delete guards use pre_delete rather than Model.delete() so that QuerySet
+# deletes and cascades are covered too: Django sends the signal per object.
+
+@receiver(pre_delete, sender=Role)
+def protect_system_role(sender, instance, **kwargs):
+    if instance.is_system:
+        raise ProtectedRoleError(f"System role {instance.name!r} cannot be deleted.")
+
+
+@receiver(pre_delete, sender=RolePermission)
+def protect_owner_grants(sender, instance, **kwargs):
+    # Role.OWNER is a seeding constant, used here only so a business can't
+    # lock its owner out (e.g. by removing settings.manage). Access checks
+    # still read RolePermission rows.
+    role = Role.all_objects.filter(pk=instance.role_id).values("name", "is_system").first()
+    if role and role["is_system"] and role["name"] == Role.OWNER:
+        raise ProtectedRoleError("Grants cannot be removed from the Owner role.")

@@ -63,7 +63,20 @@ class BusinessAdmin(admin.ModelAdmin):
 
 @admin.register(Role)
 class RoleAdmin(TenantModelAdmin):
+    """System roles can't be renamed or deleted (enforced in the model too)."""
+
     list_display = ("name", "business", "is_system")
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = super().get_readonly_fields(request, obj)
+        if obj is not None and obj.is_system:
+            return (*readonly, "name", "is_system")
+        return readonly
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.is_system:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(Permission)
@@ -87,6 +100,11 @@ class PermissionAdmin(admin.ModelAdmin):
 class RolePermissionAdmin(TenantModelAdmin):
     list_display = ("role", "permission", "business")
     list_select_related = ("role", "permission", "business")
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.role.is_system and obj.role.name == Role.OWNER:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(PasswordResetToken)
