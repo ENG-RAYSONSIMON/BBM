@@ -14,7 +14,7 @@ from accounts.models import (
     User,
     UserRole,
 )
-from accounts.rbac import PERMISSIONS, SETTINGS_MANAGE, SETTINGS_VIEW
+from accounts.rbac import DEFAULT_ROLE_PERMISSIONS, PERMISSIONS, SETTINGS_MANAGE, SETTINGS_VIEW
 from accounts.services import register_owner
 from accounts.tokens import tokens_for
 from core.permissions import HasTenantPermission
@@ -59,7 +59,8 @@ class PermissionTests(APITestCase):
                 for name in (Role.OWNER, Role.ADMIN)
             }
         self.assertEqual(grants[Role.OWNER], set(PERMISSIONS))
-        self.assertEqual(grants[Role.ADMIN], {SETTINGS_VIEW})
+        self.assertEqual(grants[Role.ADMIN], set(DEFAULT_ROLE_PERMISSIONS[Role.ADMIN]))
+        self.assertNotIn(SETTINGS_MANAGE, grants[Role.ADMIN])
 
     def test_owner_can_view_and_change_settings(self):
         self.as_user(self.owner)
@@ -153,7 +154,7 @@ class PermissionTests(APITestCase):
         self.as_user(self.admin)
         response = self.client.get(reverse_lazy("accounts:me"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["permissions"], [SETTINGS_VIEW])
+        self.assertEqual(response.data["permissions"], sorted(DEFAULT_ROLE_PERMISSIONS[Role.ADMIN]))
 
     def test_unauthenticated_settings_request_is_401(self):
         self.assertEqual(self.client.get(self.settings_url).status_code, 401)

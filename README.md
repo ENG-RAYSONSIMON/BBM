@@ -37,43 +37,37 @@ profit reports.
 - OpenAPI schema with Swagger UI and ReDoc (development only; see §6).
 - 53 tests, all passing. The FR-4/FR-5 and OpenAPI changes are not committed yet.
 
-**Open from Phase 1:** see §6–§8 of `docs/PHASE_1_SUMMARY.md`. The main items:
-- Rate limiting exists only on the password-reset endpoints; login, register
-  and refresh are unthrottled (NFR-3). Throttle counters use the in-process
-  cache, not Redis.
-- No API for managing staff, roles or grants yet (Django admin only).
-- Access tokens stay valid for up to 20 minutes after a password reset.
+**Done: Phase 2, Catalog & Inventory (FR-6 to FR-10)**, backend and frontend.
+See `docs/PHASE_2_SUMMARY.md`.
+- Categories, brands, suppliers and products (prices, SKU/barcode, reorder
+  level, expiry tracking, archive), with validated product images.
+- Stock is held per batch and is always the sum of the append-only
+  `StockMovement` ledger. Manual adjustments (stock in, damage, expiry,
+  corrections) until Phase 3 purchases and sales.
+- Live low-stock and expiry (7/30/60-day, expired) views and dashboard counts.
+- Pagination, search and filters on every list; NFR-7 cross-tenant tests on
+  every Phase 2 endpoint.
 
-**Next: Phase 2, Catalog & Inventory (FR-6 to FR-10).**
+**Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8 and `docs/PHASE_2_SUMMARY.md`
+"Known gaps" (e.g. no staff-management API yet; media served by Django in dev
+only).
 
-| FR | Requirement |
-|---|---|
-| FR-6 | Product CRUD with category, brand, supplier, batch, expiry — per tenant |
-| FR-7 | Every stock change (sale, purchase, damage, adjustment, transfer, expiry) is a `stock_movements` row |
-| FR-8 | Current stock = sum over `stock_movements`; never a directly edited quantity |
-| FR-9 | Low-stock and expiry (7/30/60-day, expired) views from live queries, filterable by category/brand/supplier |
-| FR-10 | Validate uploaded product images by type and size before storage |
+**Next: Phase 3, The Money Path (FR-11 to FR-17).** The sale transaction
+(atomic, FEFO batch consumption, COGS from snapshotted cost), purchases that
+write `PURCHASE` movements, expenses, and the profit dashboard.
 
-Rules to follow when starting Phase 2:
-- Every new tenant-owned model subclasses `core.models.TenantModel`. Don't add
-  a `business` field by hand, and never accept `business_id` from the client.
-- Use `Model.objects` in views and services. `all_objects` is only for trusted
-  system code.
-- `bulk_create()` skips `TenantModel.save()`, so set `business` explicitly there.
-- Every authenticated view must declare `required_permissions` (a tuple, or a
-  dict of HTTP method → tuple); an undeclared view raises
-  `ImproperlyConfigured`. New codenames go in `accounts/rbac.py` (`PERMISSIONS`
-  and `DEFAULT_ROLE_PERMISSIONS`) plus a data migration that inserts them and
-  grants them to existing businesses' roles (see `0003_seed_permissions`).
-  Never check role names in views or services.
-- Give every new endpoint `@extend_schema` with `tags`, a `summary` and its
-  real `responses`. `accounts.tests.test_schema` fails on any schema warning
-  or error.
-- Every detail/update/delete endpoint needs a cross-tenant test: tenant B
-  requests tenant A's UUID and must get 404 (NFR-7).
-- `stock_movements` needs a `(business, created_at)` index (NFR-8). Stock
-  thresholds come from `BusinessSettings.low_stock_threshold` and
-  `expiry_warning_days`.
+Rules that still apply:
+- Every new tenant-owned model subclasses `core.models.TenantModel`; never
+  accept `business_id` from the client. Use `Model.objects` in views and
+  services (`all_objects` only for trusted system code). `bulk_create()` skips
+  `TenantModel.save()`.
+- Foreign keys between tenant models call `check_same_business(...)` in
+  `save()` (see `catalog/models.py`).
+- Stock changes only through `inventory.services.record_movement()`.
+- Every authenticated view declares `required_permissions`. New codenames go in
+  `accounts/rbac.py` plus a data migration (see `accounts/0004_phase2_permissions`).
+- Every endpoint gets `@extend_schema`; `accounts.tests.test_schema` fails on
+  any warning. Every detail endpoint gets a cross-tenant 404 test.
 - Plan first, get approval, then implement (see `CLAUDE.md`).
 
 ---
@@ -199,7 +193,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (61 tests)
+docker compose exec backend python manage.py test            # whole suite (120 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -212,7 +206,7 @@ docker compose exec backend python manage.py check
 Frontend (from `frontend/`, after `npm install`):
 
 ```bash
-npm test            # Vitest: API client, login, register, reset token, app shell, theme
+npm test            # Vitest (31 tests): API client, auth pages, app shell, theme, products, stock dialog
 npm run lint        # oxlint
 npm run build       # type-check + production build
 ```
@@ -324,7 +318,8 @@ BBM/
 ├── .env                      # compose vars (gitignored; see .env.example)
 ├── docs/
 │   ├── BBM_SRS_Summary_Draft.pdf
-│   └── PHASE_1_SUMMARY.md
+│   ├── PHASE_1_SUMMARY.md
+│   └── PHASE_2_SUMMARY.md
 └── backend/
     ├── Dockerfile
     ├── requirements.txt
@@ -333,15 +328,21 @@ BBM/
     ├── core/                 # tenancy: TenantModel, TenantManager, tenant context,
     │                         #   TenantJWTAuthentication, HasTenantPermission,
     │                         #   OpenAPI schema hooks (schema.py), middleware, admin base
-    └── accounts/             # User, Business, Role, UserRole, BusinessSettings,
-                              #   Permission, RolePermission, PasswordResetToken;
-                              #   rbac.py (permission catalog + role defaults);
-                              #   register/login/refresh/logout/me, password reset,
-                              #   settings
+    ├── accounts/             # User, Business, Role, UserRole, BusinessSettings,
+    │                         #   Permission, RolePermission, PasswordResetToken;
+    │                         #   rbac.py (permission catalog + role defaults);
+    │                         #   register/login/refresh/logout/me, password reset,
+    │                         #   settings
+    ├── catalog/              # Category, Brand, Supplier, Product, ProductBatch;
+    │                         #   CRUD + product image upload (validators.py)
+    ├── inventory/            # StockMovement ledger, services.py (record_movement,
+    │                         #   derived stock), batches, adjustments, alerts
+    └── media/                # uploaded images, dev only (gitignored)
 frontend/
 ├── src/lib/                  # api.ts (fetch + token refresh), auth.tsx / auth-context.ts,
 │                             #   schemas.ts (Zod), forms.ts, types.ts
-├── src/pages/                # login, register, forgot/reset password, dashboard, settings
+├── src/pages/                # auth pages, dashboard, settings, products (list, detail,
+│                             #   form), inventory alerts, catalog setup
 ├── src/components/           # layout (app shell, auth layout), shadcn/ui in ui/
 └── src/routes/guards.tsx     # RequireAuth / RedirectIfAuthed
 ```

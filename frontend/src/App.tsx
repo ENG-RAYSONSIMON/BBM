@@ -6,9 +6,14 @@ import { AppShell } from '@/components/layout/app-shell'
 import { AuthLayout } from '@/components/layout/auth-layout'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth'
+import { CatalogPage } from '@/pages/catalog'
 import { DashboardPage } from '@/pages/dashboard'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
+import { InventoryPage } from '@/pages/inventory'
 import { LoginPage } from '@/pages/login'
+import { ProductDetailPage } from '@/pages/product-detail'
+import { ProductFormPage } from '@/pages/product-form'
+import { ProductsPage } from '@/pages/products'
 import { RegisterPage } from '@/pages/register'
 import { ResetPasswordPage } from '@/pages/reset-password'
 import { SettingsPage } from '@/pages/settings'
@@ -38,6 +43,12 @@ const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <DashboardPage /> },
+          { path: '/products', element: <ProductsPage /> },
+          { path: '/products/new', element: <ProductFormPage /> },
+          { path: '/products/:id', element: <ProductDetailPage /> },
+          { path: '/products/:id/edit', element: <ProductFormPage key="edit" /> },
+          { path: '/inventory', element: <InventoryPage /> },
+          { path: '/catalog', element: <CatalogPage /> },
           { path: '/settings', element: <SettingsPage /> },
         ],
       },

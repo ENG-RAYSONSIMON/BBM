@@ -59,6 +59,18 @@ class TenantModel(UUIDModel, TimeStampedModel):
                 f"{type(self).__name__} belongs to a different business than the active one."
             )
 
+    def check_same_business(self, *fk_names):
+        """Raise TenantMismatch if any of these foreign keys points at a row
+        owned by another business. Call after assign_business(). Related
+        objects load through the unscoped base manager, so a foreign row is
+        seen and refused rather than silently missing."""
+        for name in fk_names:
+            related = getattr(self, name)
+            if related is not None and str(related.business_id) != str(self.business_id):
+                raise TenantMismatch(
+                    f"{type(self).__name__}.{name} belongs to a different business."
+                )
+
     def save(self, *args, **kwargs):
         self.assign_business()
         super().save(*args, **kwargs)

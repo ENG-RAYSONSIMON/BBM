@@ -13,13 +13,26 @@ from .models import Role
 
 SETTINGS_VIEW = "settings.view"
 SETTINGS_MANAGE = "settings.manage"
+CATALOG_VIEW = "catalog.view"
+CATALOG_MANAGE = "catalog.manage"
+CATALOG_DELETE = "catalog.delete"
+INVENTORY_VIEW = "inventory.view"
+INVENTORY_ADJUST = "inventory.adjust"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
     SETTINGS_MANAGE: "Change business settings.",
+    CATALOG_VIEW: "View products, categories, brands and suppliers.",
+    CATALOG_MANAGE: "Create, edit and archive products, categories, brands and suppliers.",
+    CATALOG_DELETE: "Delete products, categories, brands and suppliers.",
+    INVENTORY_VIEW: "View stock levels, batches, movements and alerts.",
+    INVENTORY_ADJUST: "Record stock adjustments and manage batches.",
 }
 
 DEFAULT_ROLE_PERMISSIONS = {
     Role.OWNER: frozenset(PERMISSIONS),
-    Role.ADMIN: frozenset({SETTINGS_VIEW}),
+    # SRS 2.2: Admin runs day-to-day operations but cannot delete.
+    Role.ADMIN: frozenset(
+        {SETTINGS_VIEW, CATALOG_VIEW, CATALOG_MANAGE, INVENTORY_VIEW, INVENTORY_ADJUST}
+    ),
 }

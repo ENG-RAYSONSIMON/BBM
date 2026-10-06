@@ -134,6 +134,7 @@ async function doRefresh(retried = false): Promise<boolean> {
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
+  /** JSON-encoded, except FormData which is sent as multipart. */
   body?: unknown
   /** Send the bearer token and refresh on 401. Default true. */
   auth?: boolean
@@ -155,14 +156,16 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 }
 
 async function send(path: string, method: string, body: unknown, auth: boolean) {
+  const isForm = body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // For FormData the browser sets the multipart Content-Type and boundary.
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`
   try {
     return await fetch(`${API_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, null)

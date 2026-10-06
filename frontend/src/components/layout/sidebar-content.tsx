@@ -1,4 +1,11 @@
-import { LayoutDashboardIcon, LogOutIcon, SettingsIcon } from 'lucide-react'
+import {
+  BellRingIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
+  PackageIcon,
+  SettingsIcon,
+  TagsIcon,
+} from 'lucide-react'
 import type { ComponentType } from 'react'
 import { NavLink, useNavigate } from 'react-router'
 
@@ -6,14 +13,24 @@ import { Brand } from './brand'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
+import { PERMISSIONS } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-type NavItem = { to: string; label: string; icon: ComponentType<{ className?: string }> }
+type NavItem = {
+  to: string
+  label: string
+  icon: ComponentType<{ className?: string }>
+  /** Shown only to roles holding this permission. */
+  permission?: string
+}
 
-// Only features that exist get a link; later phases add Products, Sales, etc.
+// Only features that exist get a link; Phase 3 adds Sales, Purchases, etc.
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/products', label: 'Products', icon: PackageIcon, permission: PERMISSIONS.catalogView },
+  { to: '/inventory', label: 'Inventory alerts', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
+  { to: '/catalog', label: 'Catalog setup', icon: TagsIcon, permission: PERMISSIONS.catalogView },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, permission: PERMISSIONS.settingsView },
 ]
 
 /**
@@ -21,7 +38,7 @@ const NAV: NavItem[] = [
  * `onNavigate` lets the drawer close when a link is chosen.
  */
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { me, logout } = useAuth()
+  const { me, logout, can } = useAuth()
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -39,11 +56,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Brand />
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Main">
-        {NAV.map((item) => (
+        {NAV.filter((item) => !item.permission || can(item.permission)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            end
+            end={item.to === '/'}
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(

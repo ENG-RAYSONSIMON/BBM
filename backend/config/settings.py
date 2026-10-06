@@ -30,8 +30,11 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "corsheaders",
-    "core",      
-    "accounts", 
+    "django_filters",
+    "core",
+    "accounts",
+    "catalog",
+    "inventory",
 ]
 
 MIDDLEWARE = [
@@ -117,6 +120,12 @@ REST_FRAMEWORK = {
         "core.permissions.HasTenantPermission",
     ),
     "DEFAULT_SCHEMA_CLASS": "core.schema.TenantAutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.DefaultPagination",
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ),
     # NFR-3. Counters are per client IP and live in CACHES["default"]. Once
     # nginx sits in front, set NUM_PROXIES so the real client IP is used
     # instead of the proxy's.
@@ -149,6 +158,8 @@ SPECTACULAR_SETTINGS = {
         {"name": "auth", "description": "Registration, login, token rotation, current user."},
         {"name": "password reset", "description": "FR-4 single-use, time-limited reset tokens."},
         {"name": "settings", "description": "Per-business configuration."},
+        {"name": "catalog", "description": "Products, categories, brands and suppliers."},
+        {"name": "inventory", "description": "Batches, the stock ledger and stock alerts."},
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
@@ -158,11 +169,19 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# Tanzania (EAT). Datetimes are stored in UTC; this sets what "today" means,
+# e.g. for expiry windows.
+TIME_ZONE = "Africa/Dar_es_Salaam"
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+
+# Uploaded files (product images). Not under any static/web root; Django
+# serves them only when DEBUG. Production moves to object storage via STORAGES.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+PRODUCT_IMAGE_MAX_BYTES = env.int("PRODUCT_IMAGE_MAX_BYTES", default=2 * 1024 * 1024)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
