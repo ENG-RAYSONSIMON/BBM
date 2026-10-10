@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangleIcon,
+  BanknoteIcon,
   CalendarClockIcon,
-  ReceiptIcon,
+  HandCoinsIcon,
   ShoppingBagIcon,
   TrendingUpIcon,
   WalletIcon,
@@ -14,19 +15,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { formatTZS } from '@/lib/format'
 import { PERMISSIONS } from '@/lib/types'
-import type { InventorySummary } from '@/lib/types'
+import type { InventorySummary, SalesSummary } from '@/lib/types'
 
 type Icon = ComponentType<{ className?: string }>
-
-// FR-17 sales tiles. Sales and expenses arrive in Phase 3, so these show an
-// honest empty state rather than a made-up zero.
-const SALES_METRICS: { label: string; icon: Icon; empty: string }[] = [
-  { label: "Today's sales", icon: ShoppingBagIcon, empty: 'No sales recorded yet' },
-  { label: "Today's profit", icon: TrendingUpIcon, empty: 'Shown once sales are recorded' },
-  { label: "Today's expenses", icon: WalletIcon, empty: 'No expenses recorded yet' },
-  { label: 'Transactions', icon: ReceiptIcon, empty: 'No transactions yet' },
-]
 
 /** The expiry tab closest to the business's warning window. */
 function expiryView(days: number) {
@@ -36,6 +29,13 @@ function expiryView(days: number) {
 export function DashboardPage() {
   const { me, can } = useAuth()
   const canSeeStock = can(PERMISSIONS.inventoryView)
+  const canSeeSales = can(PERMISSIONS.salesView)
+  // FR-17: today's figures (the server's "today" is Africa/Dar_es_Salaam).
+  const sales = useQuery({
+    queryKey: ['sales', 'summary', 'today'],
+    queryFn: () => api<SalesSummary>('/sales/summary/'),
+    enabled: canSeeSales,
+  })
   const summary = useQuery({
     queryKey: ['inventory', 'summary'],
     queryFn: () => api<InventorySummary>('/inventory/summary/'),
@@ -55,11 +55,54 @@ export function DashboardPage() {
       </div>
 
       <section aria-label="Today at a glance" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SALES_METRICS.map((metric) => (
-          <Tile key={metric.label} label={metric.label} icon={metric.icon} value="—" valueLabel="No data">
-            {metric.empty}
-          </Tile>
-        ))}
+        {canSeeSales && (
+          <>
+            <Tile
+              label="Today's sales"
+              icon={ShoppingBagIcon}
+              to="/sales"
+              value={sales.data && formatTZS(sales.data.revenue)}
+              loading={sales.isPending}
+              error={sales.isError}
+            >
+              {sales.data &&
+                (sales.data.sales_count === 0
+                  ? 'No sales yet today'
+                  : `${sales.data.sales_count} ${sales.data.sales_count === 1 ? 'sale' : 'sales'}`)}
+            </Tile>
+            <Tile
+              label="Today's profit"
+              icon={TrendingUpIcon}
+              value={sales.data && formatTZS(sales.data.gross_profit)}
+              loading={sales.isPending}
+              error={sales.isError}
+            >
+              {sales.data && `Sales minus cost of goods (${formatTZS(sales.data.cogs)})`}
+            </Tile>
+            <Tile
+              label="Cash collected today"
+              icon={BanknoteIcon}
+              value={sales.data && formatTZS(sales.data.cash_collected)}
+              loading={sales.isPending}
+              error={sales.isError}
+            >
+              Cash received, including debt repayments, less refunds
+            </Tile>
+            <Tile
+              label="Owed by customers"
+              icon={HandCoinsIcon}
+              to="/customers?owes=true"
+              value={sales.data && formatTZS(sales.data.outstanding_credit)}
+              loading={sales.isPending}
+              error={sales.isError}
+            >
+              Unpaid balances on credit sales
+            </Tile>
+          </>
+        )}
+        <Tile label="Today's expenses" icon={WalletIcon} value={undefined} valueLabel="No data">
+          Expense tracking comes next
+        </Tile>
         {canSeeStock && (
           <>
             <Tile
@@ -94,10 +137,10 @@ export function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Products and stock are live</CardTitle>
+          <CardTitle>Figures are live</CardTitle>
           <CardDescription>
-            Stock levels and alerts above come from your own records. Sales, profit and expenses will
-            fill in once sales recording arrives.
+            Sales, profit, cash and stock above come straight from your records. Profit counts a sale on the
+            day it is made, even when the customer pays later; net profit arrives with expenses.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -124,7 +167,7 @@ function Tile({
   error?: boolean
   children?: ReactNode
 }) {
-  const muted = typeof value !== 'number'
+  const muted = value === undefined
   const card = (
     <Card className={to ? 'hover:bg-muted/50 h-full transition-colors' : 'h-full'}>
       <CardHeader>
@@ -136,7 +179,7 @@ function Tile({
           <Skeleton className="h-8 w-16" />
         ) : (
           <CardTitle className={muted ? 'text-muted-foreground text-2xl' : 'text-2xl tabular-nums'} aria-label={valueLabel}>
-            {error ? '—' : value}
+            {error || value === undefined ? '—' : value}
           </CardTitle>
         )}
       </CardHeader>

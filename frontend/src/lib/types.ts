@@ -50,6 +50,9 @@ export const PERMISSIONS = {
   catalogDelete: 'catalog.delete',
   inventoryView: 'inventory.view',
   inventoryAdjust: 'inventory.adjust',
+  salesView: 'sales.view',
+  salesCreate: 'sales.create',
+  salesVoid: 'sales.void',
 } as const
 
 /** DRF page-number pagination envelope. */
@@ -125,7 +128,7 @@ export type Batch = {
   created_at: string
 }
 
-export type MovementType = 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'DAMAGE' | 'EXPIRY' | 'TRANSFER'
+export type MovementType = 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'DAMAGE' | 'EXPIRY' | 'TRANSFER' | 'RETURN'
 
 export type StockMovement = {
   id: string
@@ -157,4 +160,93 @@ export type InventorySummary = {
   expiring_soon: number
   expired: number
   expiry_warning_days: number
+}
+
+// ---- Phase 3: sales --------------------------------------------------------
+// Money fields are decimal strings ("12000.00"), like product prices.
+
+export type Customer = {
+  id: string
+  name: string
+  phone: string
+  notes: string
+  total_bought: string
+  amount_paid: string
+  /** Still owed on credit sales. */
+  balance: string
+  created_at: string
+  updated_at: string
+}
+
+export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID' | 'VOID'
+
+export type Sale = {
+  id: string
+  number: number
+  receipt_number: string
+  status: 'COMPLETED' | 'VOID'
+  customer: string | null
+  customer_name: string | null
+  customer_phone: string | null
+  sold_by: string
+  sold_by_name: string
+  subtotal: string
+  discount_total: string
+  total: string
+  cost_total: string
+  gross_profit: string
+  amount_paid: string
+  balance: string
+  payment_status: PaymentStatus
+  note: string
+  created_at: string
+}
+
+export type SaleItem = {
+  id: string
+  product: string
+  product_name: string
+  quantity: number
+  unit_price: string
+  discount: string
+  line_total: string
+  unit_cost: string
+  line_cost: string
+  allocations: { batch: string; batch_number: string; expiry_date: string | null; quantity: number }[]
+}
+
+export type Payment = {
+  id: string
+  kind: 'PAYMENT' | 'REFUND'
+  method: 'CASH'
+  amount: string
+  amount_received: string
+  change_given: string
+  received_by: string
+  received_by_name: string
+  note: string
+  created_at: string
+}
+
+export type SaleDetail = Sale & {
+  items: SaleItem[]
+  payments: Payment[]
+  voided_at: string | null
+  voided_by: string | null
+  voided_by_name: string
+  void_reason: string
+}
+
+export type SalesSummary = {
+  date_from: string
+  date_to: string
+  sales_count: number
+  revenue: string
+  discounts: string
+  cogs: string
+  gross_profit: string
+  /** Payments − refunds in the range. */
+  cash_collected: string
+  /** Still owed on all sales, all time. */
+  outstanding_credit: string
 }

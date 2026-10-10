@@ -18,6 +18,9 @@ CATALOG_MANAGE = "catalog.manage"
 CATALOG_DELETE = "catalog.delete"
 INVENTORY_VIEW = "inventory.view"
 INVENTORY_ADJUST = "inventory.adjust"
+SALES_VIEW = "sales.view"
+SALES_CREATE = "sales.create"
+SALES_VOID = "sales.void"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
@@ -27,12 +30,23 @@ PERMISSIONS = {
     CATALOG_DELETE: "Delete products, categories, brands and suppliers.",
     INVENTORY_VIEW: "View stock levels, batches, movements and alerts.",
     INVENTORY_ADJUST: "Record stock adjustments and manage batches.",
+    SALES_VIEW: "View sales, payments, customers and sales totals.",
+    SALES_CREATE: "Record sales and customer payments, and manage customers.",
+    SALES_VOID: "Void a sale, returning its stock and refunding its payments.",
 }
 
 DEFAULT_ROLE_PERMISSIONS = {
     Role.OWNER: frozenset(PERMISSIONS),
     # SRS 2.2: Admin runs day-to-day operations but cannot delete.
     Role.ADMIN: frozenset(
-        {SETTINGS_VIEW, CATALOG_VIEW, CATALOG_MANAGE, INVENTORY_VIEW, INVENTORY_ADJUST}
+        {
+            SETTINGS_VIEW,
+            CATALOG_VIEW,
+            CATALOG_MANAGE,
+            INVENTORY_VIEW,
+            INVENTORY_ADJUST,
+            SALES_VIEW,
+            SALES_CREATE,
+        }
     ),
 }

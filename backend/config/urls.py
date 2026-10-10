@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/v1/', include('accounts.urls')),
     path('api/v1/', include('catalog.urls')),
     path('api/v1/', include('inventory.urls')),
+    path('api/v1/', include('sales.urls')),
 ]
 
 # OpenAPI schema and docs UIs: development only, so production doesn't

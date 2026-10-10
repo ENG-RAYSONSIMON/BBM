@@ -6,17 +6,12 @@ import { AppShell } from '@/components/layout/app-shell'
 import { AuthLayout } from '@/components/layout/auth-layout'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth'
-import { CatalogPage } from '@/pages/catalog'
 import { DashboardPage } from '@/pages/dashboard'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
-import { InventoryPage } from '@/pages/inventory'
 import { LoginPage } from '@/pages/login'
-import { ProductDetailPage } from '@/pages/product-detail'
 import { ProductFormPage } from '@/pages/product-form'
-import { ProductsPage } from '@/pages/products'
 import { RegisterPage } from '@/pages/register'
 import { ResetPasswordPage } from '@/pages/reset-password'
-import { SettingsPage } from '@/pages/settings'
 import { RedirectIfAuthed, RequireAuth } from '@/routes/guards'
 
 const queryClient = new QueryClient({
@@ -43,13 +38,25 @@ const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <DashboardPage /> },
-          { path: '/products', element: <ProductsPage /> },
+          // Other pages load on first visit, keeping the initial bundle small.
+          { path: '/pos', lazy: () => import('@/pages/pos').then((m) => ({ Component: m.PosPage })) },
+          { path: '/sales', lazy: () => import('@/pages/sales').then((m) => ({ Component: m.SalesPage })) },
+          {
+            path: '/sales/:id',
+            lazy: () => import('@/pages/sale-detail').then((m) => ({ Component: m.SaleDetailPage })),
+          },
+          { path: '/customers', lazy: () => import('@/pages/customers').then((m) => ({ Component: m.CustomersPage })) },
+          { path: '/products', lazy: () => import('@/pages/products').then((m) => ({ Component: m.ProductsPage })) },
+          // The form stays eager: `key` remounts it when switching new ↔ edit.
           { path: '/products/new', element: <ProductFormPage /> },
-          { path: '/products/:id', element: <ProductDetailPage /> },
+          {
+            path: '/products/:id',
+            lazy: () => import('@/pages/product-detail').then((m) => ({ Component: m.ProductDetailPage })),
+          },
           { path: '/products/:id/edit', element: <ProductFormPage key="edit" /> },
-          { path: '/inventory', element: <InventoryPage /> },
-          { path: '/catalog', element: <CatalogPage /> },
-          { path: '/settings', element: <SettingsPage /> },
+          { path: '/inventory', lazy: () => import('@/pages/inventory').then((m) => ({ Component: m.InventoryPage })) },
+          { path: '/catalog', lazy: () => import('@/pages/catalog').then((m) => ({ Component: m.CatalogPage })) },
+          { path: '/settings', lazy: () => import('@/pages/settings').then((m) => ({ Component: m.SettingsPage })) },
         ],
       },
     ],

@@ -24,4 +24,13 @@ describe('SidebarContent', () => {
     expect(nav).toHaveTextContent('Catalog setup')
     expect(nav).not.toHaveTextContent('Settings')
   })
+
+  it('shows selling links only with sales permissions', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['sales.view'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+
+    expect(nav).toHaveTextContent('Sales')
+    expect(nav).toHaveTextContent('Customers')
+    expect(nav).not.toHaveTextContent('New sale')
+  })
 })

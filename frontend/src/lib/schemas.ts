@@ -120,3 +120,23 @@ export const adjustmentSchema = z
   })
 export type AdjustmentInput = z.input<typeof adjustmentSchema>
 export type AdjustmentValues = z.output<typeof adjustmentSchema>
+
+// ---- Phase 3: sales ----------------------------------------------------------
+
+export const customerSchema = z.object({
+  name: z.string().trim().min(1, 'Enter the customer’s name.').max(255),
+  phone: z.string().trim().max(20),
+  notes: z.string().trim(),
+})
+export type CustomerValues = z.infer<typeof customerSchema>
+
+export const paymentSchema = z.object({
+  amount_received: money.refine((v) => Number(v) > 0, 'Enter the cash received.'),
+  note: z.string().trim().max(255),
+})
+export type PaymentValues = z.infer<typeof paymentSchema>
+
+export const voidSchema = z.object({
+  reason: z.string().trim().min(1, 'Say why the sale is being voided.').max(255),
+})
+export type VoidValues = z.infer<typeof voidSchema>

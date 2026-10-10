@@ -3,8 +3,11 @@ import {
   LayoutDashboardIcon,
   LogOutIcon,
   PackageIcon,
+  ReceiptIcon,
   SettingsIcon,
+  ShoppingCartIcon,
   TagsIcon,
+  UsersIcon,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { NavLink, useNavigate } from 'react-router'
@@ -24,9 +27,12 @@ type NavItem = {
   permission?: string
 }
 
-// Only features that exist get a link; Phase 3 adds Sales, Purchases, etc.
+// Only features that exist get a link; purchases and expenses come next.
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
+  { to: '/pos', label: 'New sale', icon: ShoppingCartIcon, permission: PERMISSIONS.salesCreate },
+  { to: '/sales', label: 'Sales', icon: ReceiptIcon, permission: PERMISSIONS.salesView },
+  { to: '/customers', label: 'Customers', icon: UsersIcon, permission: PERMISSIONS.salesView },
   { to: '/products', label: 'Products', icon: PackageIcon, permission: PERMISSIONS.catalogView },
   { to: '/inventory', label: 'Inventory alerts', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
   { to: '/catalog', label: 'Catalog setup', icon: TagsIcon, permission: PERMISSIONS.catalogView },

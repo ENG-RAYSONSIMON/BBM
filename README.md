@@ -6,7 +6,8 @@ profit reports.
 
 - Requirements: `docs/BBM_SRS_Summary_Draft.pdf`
 - Architecture rules and working conventions: `CLAUDE.md`
-- What Phase 1 actually built: `docs/PHASE_1_SUMMARY.md`
+- What each phase built: `docs/PHASE_1_SUMMARY.md`, `docs/PHASE_2_SUMMARY.md`,
+  `docs/PHASE_3_SUMMARY.md`
 
 ---
 
@@ -48,13 +49,27 @@ See `docs/PHASE_2_SUMMARY.md`.
 - Pagination, search and filters on every list; NFR-7 cross-tenant tests on
   every Phase 2 endpoint.
 
-**Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8 and `docs/PHASE_2_SUMMARY.md`
-"Known gaps" (e.g. no staff-management API yet; media served by Django in dev
-only).
+**In progress: Phase 3, The Money Path.** Step 1, cash sales with credit
+(FR-11 to FR-13, FR-16 gross profit, FR-17), is done. See
+`docs/PHASE_3_SUMMARY.md`.
+- A sale is one atomic transaction: stock is checked and taken from the
+  earliest-expiring batches (expired stock is never sold), price and cost are
+  snapshotted, and the cash received is recorded with the change given.
+- Selling on credit: a customer can pay part or nothing; the balance is tracked
+  per sale and per customer, and repayments are recorded later.
+- Voiding a sale returns its stock to the original batches and refunds the
+  cash collected; nothing is deleted. Payments, like stock movements, are
+  append-only.
+- Sale screen (`/pos`), sales list and receipts, customers with what they owe,
+  and live dashboard tiles (today's sales, profit, cash collected, credit
+  outstanding).
 
-**Next: Phase 3, The Money Path (FR-11 to FR-17).** The sale transaction
-(atomic, FEFO batch consumption, COGS from snapshotted cost), purchases that
-write `PURCHASE` movements, expenses, and the profit dashboard.
+**Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8, `docs/PHASE_2_SUMMARY.md` and
+`docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. no staff-management API yet;
+media served by Django in dev only; cash is the only payment method).
+
+**Next: Phase 3 step 2, purchases (FR-14)** that write `PURCHASE` movements,
+then expenses (FR-15) and net profit.
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -79,8 +94,11 @@ Rules that still apply:
 - Git
 - Optional: `curl` and `jq` for trying the API from a shell
 
-No local Python is needed; everything runs in containers. (`backend/venv/` is
-gitignored if you keep one for editor tooling.)
+No local Python or Node is needed; everything runs in containers. (`backend/venv/`
+is gitignored if you keep one for editor tooling.)
+
+These host ports must be free: `5173` (frontend), `8000` (backend), `5433`
+(Postgres) and `6379` (Redis).
 
 ## Stack in this repo today
 
@@ -89,8 +107,11 @@ gitignored if you keep one for editor tooling.)
 | `db` | `postgres:15` (named volume `pgdata`) | `5433` → 5432 |
 | `redis` | `redis:7` (throttle counters, via `REDIS_URL`) | `6379` |
 | `backend` | `./backend` (Python 3.12, Django 6.1, DRF, SimpleJWT, drf-spectacular), `runserver` with `./backend` mounted at `/app` | `8000` |
-
 | `frontend` | `node:24-alpine`, Vite dev server with `./frontend` mounted (`npm ci` on start) | `5173` |
+
+The frontend's `node_modules` lives in the named volume `frontend_node_modules`,
+not in `./frontend/node_modules` on your machine, so the Linux-built packages in
+the container never mix with anything you install locally.
 
 `nginx` isn't in `docker-compose.yml` yet.
 
@@ -145,30 +166,115 @@ Notes:
   is added, its credentials go in `backend/.env` as `REPLACE_ME` placeholders.
 - To generate a secret key:
   `docker compose run --rm backend python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"`
+- `CORS_ALLOWED_ORIGINS` must contain the exact origin the browser loads the
+  frontend from (`http://localhost:5173`). If it doesn't match, login and every
+  other API call fail with a CORS error in the browser console.
+
+**Frontend: no env file needed under Docker.** `docker-compose.yml` sets
+`VITE_API_URL=http://localhost:8000/api/v1` on the `frontend` service. The
+browser calls that URL, so it uses the host port, not `backend:8000`.
+`frontend/.env` (copied from `frontend/.env.example`) is only used if you run
+`npm run dev` on your machine outside Docker.
 
 ## 2. Bring the stack up
 
+### First run
+
+1. Create and fill in the env files (§1).
+
+2. Build and start all four services (db, redis, backend, frontend):
+
+   ```bash
+   docker compose up -d --build
+   docker compose ps                   # db, redis, backend and frontend should all be "Up"
+   ```
+
+3. Wait for the frontend to be ready. The first start runs `npm ci` inside the
+   container, which takes a minute or two; later starts are faster.
+
+   ```bash
+   docker compose logs -f frontend     # wait for "Local: http://localhost:5173/"; Ctrl+C to stop following
+   docker compose logs -f backend      # runserver output, should say "Starting development server"
+   ```
+
+4. Create the database tables (first run, and after pulling new migrations):
+
+   ```bash
+   docker compose exec backend python manage.py migrate
+   ```
+
+5. Open **http://localhost:5173**, click **Register**, and create a business.
+   You land on the dashboard as its Owner. From there, set up
+   **Catalog** (categories, brands, suppliers), add **Products**, adjust stock
+   from a product's page, and check **Inventory** for low-stock and expiry
+   alerts.
+
+| URL | What |
+|---|---|
+| http://localhost:5173 | The app (React frontend) |
+| http://localhost:8000/api/v1/ | REST API |
+| http://localhost:8000/admin/ | Django admin (needs a superuser, §3) |
+| http://localhost:8000/api/docs/ | Swagger UI (`DEBUG=True` only, §6) |
+
+### Day to day
+
 ```bash
-docker compose up -d --build        # db, redis, backend
-docker compose ps                   # all three should be "Up"
-docker compose logs -f backend      # watch runserver; Ctrl+C to stop following
+docker compose up -d                # start everything (no rebuild needed)
+docker compose restart frontend     # restart one service
+docker compose restart backend
+docker compose logs -f backend frontend
 ```
 
-`depends_on` has no healthcheck, so on a cold start the backend can come up
-before Postgres accepts connections. If the backend logs show a connection
-error, run `docker compose restart backend`.
+`./backend` and `./frontend` are bind-mounted, so code changes hot-reload:
+runserver restarts on Python changes and Vite updates the browser on frontend
+changes. Rebuild the backend image (`docker compose up -d --build backend`)
+only after changing `backend/requirements.txt`.
 
-To stop:
+After `frontend/package.json` or `package-lock.json` changes, run
+`docker compose restart frontend`; `npm ci` runs on every start and reinstalls
+from the lockfile. If the frontend still sees stale or broken packages, recreate
+its dependency volume:
 
 ```bash
-docker compose down                 # keeps the database volume
-docker compose down -v              # also DELETES the pgdata volume (all data)
+docker compose down
+docker volume ls | grep frontend_node_modules   # name is prefixed with the project dir, e.g. bbm_
+docker volume rm bbm_frontend_node_modules
+docker compose up -d
 ```
+
+### Stop
+
+```bash
+docker compose down                 # stops containers, keeps the volumes (data is kept)
+docker compose down -v              # also DELETES the volumes: the database (all data)
+                                    #   and the frontend node_modules
+```
+
+### Troubleshooting
+
+- **Backend logs show a database connection error on a cold start.**
+  `depends_on` has no healthcheck, so the backend can start before Postgres
+  accepts connections. Run `docker compose restart backend`.
+- **The browser console shows a CORS error, or login does nothing.** Check
+  that `CORS_ALLOWED_ORIGINS` in `backend/.env` is `http://localhost:5173`, then
+  `docker compose restart backend`.
+- **API calls fail with "relation ... does not exist".** Migrations haven't
+  been applied; run step 4.
+- **http://localhost:5173 doesn't load.** `npm ci` may still be running or may
+  have failed; check `docker compose logs frontend`.
+- **"port is already allocated".** Another process uses 5173, 8000, 5433 or
+  6379. Stop it, or change the left side of that port mapping in
+  `docker-compose.yml`. If you change the backend port, also update
+  `VITE_API_URL`.
+- **Password-reset email.** It isn't sent; the link is printed in
+  `docker compose logs backend`.
 
 ## 3. Migrations and an admin user
 
+The first `migrate` is part of §2. Other useful commands:
+
 ```bash
-docker compose exec backend python manage.py migrate          # accounts 0001–0003
+docker compose exec backend python manage.py migrate          # accounts, catalog, inventory, …
 docker compose exec backend python manage.py showmigrations
 docker compose exec backend python manage.py createsuperuser   # asks for email, not username
 ```
@@ -193,23 +299,27 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (120 tests)
+docker compose exec backend python manage.py test            # whole suite (154 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
 docker compose exec backend python manage.py test accounts.tests.test_password_reset
 docker compose exec backend python manage.py test accounts.tests.test_permissions
 docker compose exec backend python manage.py test accounts.tests.test_schema
+docker compose exec backend python manage.py test sales      # sales, credit, voids, isolation
 docker compose exec backend python manage.py check
 ```
 
-Frontend (from `frontend/`, after `npm install`):
+Frontend, inside the running `frontend` container:
 
 ```bash
-npm test            # Vitest (31 tests): API client, auth pages, app shell, theme, products, stock dialog
-npm run lint        # oxlint
-npm run build       # type-check + production build
+docker compose exec frontend npm test         # Vitest (47 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, dashboard
+docker compose exec frontend npm run lint     # oxlint
+docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
+
+Or locally from `frontend/` after `npm install`: `npm test`, `npm run lint`,
+`npm run build`.
 
 If the backend container isn't running, replace `exec backend` with
 `run --rm backend`. Tests create and then drop a `test_<POSTGRES_DB>` database,
@@ -270,9 +380,30 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | POST | `/api/v1/auth/password-reset/confirm/` | none, 5/hour per IP | — |
 | GET | `/api/v1/settings/` | Bearer | `settings.view` |
 | PATCH | `/api/v1/settings/` | Bearer | `settings.manage` |
+| GET | `/api/v1/sales/` | Bearer | `sales.view` |
+| POST | `/api/v1/sales/` | Bearer | `sales.create` |
+| GET | `/api/v1/sales/{id}/` | Bearer | `sales.view` |
+| POST | `/api/v1/sales/{id}/payments/` | Bearer | `sales.create` |
+| POST | `/api/v1/sales/{id}/void/` | Bearer | `sales.void` (Owner) |
+| GET | `/api/v1/sales/summary/` | Bearer | `sales.view` |
+| GET/POST/PATCH/DELETE | `/api/v1/customers/` … | Bearer | view / `sales.create` / `sales.void` to delete |
 
 A missing permission returns **403**. Request and response details:
-`docs/PHASE_1_SUMMARY.md` §3 (auth), §7 (password reset), §8 (permissions).
+`docs/PHASE_1_SUMMARY.md` §3 (auth), §7 (password reset), §8 (permissions);
+catalog and inventory endpoints in `docs/PHASE_2_SUMMARY.md` §5; sales in
+`docs/PHASE_3_SUMMARY.md` §4.
+
+```bash
+# A cash sale: 2 units, 30,000 handed over (change is computed and stored)
+curl -s -X POST localhost:8000/api/v1/sales/ \
+  -H "Authorization: Bearer $ACCESS" -H 'Content-Type: application/json' \
+  -d '{"items":[{"product":"<product id>","quantity":2}],"amount_received":"30000"}' | jq
+
+# On credit: pay 5,000 now, the rest is owed by a new customer
+curl -s -X POST localhost:8000/api/v1/sales/ \
+  -H "Authorization: Bearer $ACCESS" -H 'Content-Type: application/json' \
+  -d '{"items":[{"product":"<product id>","quantity":1}],"amount_received":"5000","new_customer":{"name":"Mama Asha","phone":"0712000000"}}' | jq
+```
 
 ## 6. API docs (OpenAPI)
 
@@ -314,7 +445,7 @@ docker compose exec backend python manage.py spectacular --validate --fail-on-wa
 
 ```
 BBM/
-├── docker-compose.yml
+├── docker-compose.yml        # db, redis, backend, frontend
 ├── .env                      # compose vars (gitignored; see .env.example)
 ├── docs/
 │   ├── BBM_SRS_Summary_Draft.pdf
@@ -337,12 +468,16 @@ BBM/
     │                         #   CRUD + product image upload (validators.py)
     ├── inventory/            # StockMovement ledger, services.py (record_movement,
     │                         #   derived stock), batches, adjustments, alerts
+    ├── sales/                # Customer, Sale, SaleItem, SaleItemAllocation, Payment;
+    │                         #   services.py (create_sale, record_payment, void_sale,
+    │                         #   derived balances, summary)
     └── media/                # uploaded images, dev only (gitignored)
 frontend/
 ├── src/lib/                  # api.ts (fetch + token refresh), auth.tsx / auth-context.ts,
 │                             #   schemas.ts (Zod), forms.ts, types.ts
 ├── src/pages/                # auth pages, dashboard, settings, products (list, detail,
-│                             #   form), inventory alerts, catalog setup
+│                             #   form), inventory alerts, catalog setup, sale screen (pos),
+│                             #   sales + receipt, customers
 ├── src/components/           # layout (app shell, auth layout), shadcn/ui in ui/
 └── src/routes/guards.tsx     # RequireAuth / RedirectIfAuthed
 ```

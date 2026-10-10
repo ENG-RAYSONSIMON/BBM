@@ -25,11 +25,12 @@ class StockMovement(TenantModel):
         DAMAGE = "DAMAGE", "Damage"
         EXPIRY = "EXPIRY", "Expiry"
         TRANSFER = "TRANSFER", "Transfer"
+        RETURN = "RETURN", "Return"
 
     # Types whose quantity must be negative / positive. ADJUSTMENT and
     # TRANSFER may go either way.
     OUTBOUND = (Type.SALE, Type.DAMAGE, Type.EXPIRY)
-    INBOUND = (Type.PURCHASE,)
+    INBOUND = (Type.PURCHASE, Type.RETURN)
 
     product = models.ForeignKey(
         "catalog.Product", on_delete=models.PROTECT, related_name="stock_movements"
@@ -57,6 +58,11 @@ class StockMovement(TenantModel):
             models.CheckConstraint(
                 condition=~Q(movement_type="PURCHASE") | Q(quantity__gt=0),
                 name="inventory_movement_purchase_is_positive",
+            ),
+            # Stock coming back from a voided sale.
+            models.CheckConstraint(
+                condition=~Q(movement_type="RETURN") | Q(quantity__gt=0),
+                name="inventory_movement_return_is_positive",
             ),
         ]
         indexes = [

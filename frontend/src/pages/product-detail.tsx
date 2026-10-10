@@ -29,6 +29,7 @@ const MOVEMENT_LABELS: Record<MovementType, string> = {
   DAMAGE: 'Damage',
   EXPIRY: 'Expired',
   TRANSFER: 'Transfer',
+  RETURN: 'Returned (sale voided)',
 }
 
 function daysUntil(date: string) {
