@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from catalog.models import Product, ProductBatch
@@ -31,17 +32,17 @@ class BatchSerializer(serializers.ModelSerializer):
         if self.instance is not None:
             clash = clash.exclude(pk=self.instance.pk)
         if clash.exists():
-            raise serializers.ValidationError("This product already has a batch with this number.")
+            raise serializers.ValidationError(_("This product already has a batch with this number."))
         return value
 
     def validate(self, attrs):
         product = self.instance.product if self.instance else self.context["product"]
         expiry = attrs.get("expiry_date", getattr(self.instance, "expiry_date", None))
         if product.tracks_expiry and not expiry:
-            raise serializers.ValidationError({"expiry_date": ["This product's batches need an expiry date."]})
+            raise serializers.ValidationError({"expiry_date": [_("This product's batches need an expiry date.")]})
         if not product.tracks_expiry and expiry:
             raise serializers.ValidationError(
-                {"expiry_date": ["This product doesn't track expiry. Turn it on for the product first."]}
+                {"expiry_date": [_("This product doesn't track expiry. Turn it on for the product first.")]}
             )
         return attrs
 
@@ -121,13 +122,13 @@ class StockAdjustmentSerializer(serializers.Serializer):
     def validate(self, attrs):
         quantity = attrs["quantity"]
         if quantity == 0:
-            raise serializers.ValidationError({"quantity": ["Enter a quantity other than 0."]})
+            raise serializers.ValidationError({"quantity": [_("Enter a quantity other than 0.")]})
         if attrs["movement_type"] in StockMovement.OUTBOUND and quantity > 0:
             raise serializers.ValidationError(
-                {"quantity": ["Damage and expiry remove stock, so the quantity must be negative."]}
+                {"quantity": [_("Damage and expiry remove stock, so the quantity must be negative.")]}
             )
         if quantity < 0 and attrs.get("batch") is None and attrs["product"].tracks_expiry:
-            raise serializers.ValidationError({"batch": ["Choose the batch to remove stock from."]})
+            raise serializers.ValidationError({"batch": [_("Choose the batch to remove stock from.")]})
         return attrs
 
     def create(self, validated_data):
@@ -155,7 +156,7 @@ class StockAdjustmentSerializer(serializers.Serializer):
             raise serializers.ValidationError(exc.message_dict)
         except InsufficientStock as exc:
             raise serializers.ValidationError(
-                {"quantity": [f"Only {exc.available} in stock in this batch."]}
+                {"quantity": [_("Only %(count)s in stock in this batch.") % {"count": exc.available}]}
             )
 
 

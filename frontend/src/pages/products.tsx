@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { PlusIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { DataList, PAGE_SIZE } from '@/components/data-list'
 import type { Column } from '@/components/data-list'
@@ -19,18 +20,14 @@ import { PERMISSIONS } from '@/lib/types'
 import type { Paginated, Product } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
 
-const STOCK_FILTERS = [
-  { id: 'low', name: 'Low stock' },
-  { id: 'out', name: 'Out of stock' },
-  { id: 'in', name: 'In stock' },
-]
-const STATUS_FILTERS = [
-  { id: 'false', name: 'Archived' },
-  { id: 'all', name: 'Active and archived' },
-]
-
 export function ProductsPage() {
   const { can } = useAuth()
+  const { t } = useTranslation()
+  const STOCK_FILTERS = (['low', 'out', 'in'] as const).map((id) => ({ id, name: t(`stock.${id}`) }))
+  const STATUS_FILTERS = [
+    { id: 'false', name: t('products.archived') },
+    { id: 'all', name: t('products.activeAndArchived') },
+  ]
   const navigate = useNavigate()
   const list = useListParams()
   const filters = {
@@ -59,14 +56,14 @@ export function ProductsPage() {
     <Button asChild size="lg">
       <Link to="/products/new">
         <PlusIcon />
-        Add product
+        {t('products.add')}
       </Link>
     </Button>
   )
 
   const columns: Column<Product>[] = [
     {
-      header: 'Product',
+      header: t('products.product'),
       cell: (p) => (
         <div className="flex items-center gap-3">
           <ProductThumb product={p} />
@@ -76,13 +73,13 @@ export function ProductsPage() {
               {[p.sku, p.brand_detail?.name, p.category_detail?.name].filter(Boolean).join(' · ') || '—'}
             </p>
           </div>
-          {!p.is_active && <span className="text-muted-foreground text-xs">(archived)</span>}
+          {!p.is_active && <span className="text-muted-foreground text-xs">{t('products.archivedTag')}</span>}
         </div>
       ),
     },
-    { header: 'Price', cell: (p) => formatTZS(p.selling_price), className: 'text-right' },
+    { header: t('common.price'), cell: (p) => formatTZS(p.selling_price), className: 'text-right' },
     {
-      header: 'Stock',
+      header: t('products.stock'),
       cell: (p) => (
         <div className="flex items-center justify-end gap-2">
           <StockBadge status={p.stock_status} />
@@ -93,34 +90,34 @@ export function ProductsPage() {
       ),
       className: 'text-right',
     },
-    { header: 'Nearest expiry', cell: (p) => formatDate(p.nearest_expiry), className: 'text-right' },
+    { header: t('products.nearestExpiry'), cell: (p) => formatDate(p.nearest_expiry), className: 'text-right' },
   ]
 
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
-      <PageHeader title="Products" description="Your catalog and current stock." actions={addButton} />
+      <PageHeader title={t('products.title')} description={t('products.subtitle')} actions={addButton} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <SearchInput
           className="sm:col-span-2 lg:col-span-6"
           value={list.search}
           onChange={list.setSearch}
-          placeholder="Search name, SKU or barcode"
+          placeholder={t('common.searchProducts')}
         />
-        <RefSelect hideLabel label="Category" noneLabel="All categories" value={filters.category}
+        <RefSelect hideLabel label={t('common.category')} noneLabel={t('products.allCategories')} value={filters.category}
           onChange={(v) => list.set('category', v)} options={categories.data} />
-        <RefSelect hideLabel label="Brand" noneLabel="All brands" value={filters.brand}
+        <RefSelect hideLabel label={t('common.brand')} noneLabel={t('products.allBrands')} value={filters.brand}
           onChange={(v) => list.set('brand', v)} options={brands.data} />
-        <RefSelect hideLabel label="Supplier" noneLabel="All suppliers" value={filters.supplier}
+        <RefSelect hideLabel label={t('common.supplier')} noneLabel={t('products.allSuppliers')} value={filters.supplier}
           onChange={(v) => list.set('supplier', v)} options={suppliers.data} />
-        <RefSelect hideLabel label="Stock" noneLabel="Any stock level" value={filters.stock_status}
+        <RefSelect hideLabel label={t('products.stock')} noneLabel={t('products.anyStock')} value={filters.stock_status}
           onChange={(v) => list.set('stock', v)} options={STOCK_FILTERS} />
-        <RefSelect hideLabel label="Status" noneLabel="Active" value={list.get('status')}
+        <RefSelect hideLabel label={t('common.status')} noneLabel={t('products.active')} value={list.get('status')}
           onChange={(v) => list.set('status', v)} options={STATUS_FILTERS} />
       </div>
 
       <DataList
-        label="products"
+        label={t('products.listLabel')}
         query={query}
         columns={columns}
         rowKey={(p) => p.id}
@@ -129,10 +126,10 @@ export function ProductsPage() {
         onPageChange={list.setPage}
         empty={
           filtered
-            ? { title: 'No products match', description: 'Try a different search or clear the filters.' }
+            ? { title: t('products.noMatch'), description: t('common.noMatchHint') }
             : {
-                title: 'No products yet',
-                description: 'Add your first product, then record its stock.',
+                title: t('products.empty'),
+                description: t('products.emptyText'),
                 action: addButton,
               }
         }

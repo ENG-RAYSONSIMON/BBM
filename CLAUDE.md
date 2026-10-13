@@ -9,8 +9,13 @@ reporting — entirely scoped per business (tenant).
   Celery (deferred to Phase 4), Argon2 password hashing, JWT via SimpleJWT
   with refresh rotation, drf-spectacular for OpenAPI docs.
 - Frontend: React (Vite), TypeScript, Tailwind, shadcn/ui, TanStack Query,
-  React Hook Form, Zod, Recharts. (not started yet)
-- Infra: Docker Compose (db, redis, backend, frontend, nginx).
+  React Hook Form, Zod, Recharts, Vitest, i18next.
+- Status: Phases 1–3 complete (auth and roles, catalog/inventory, POS,
+  sales and credit, customers, purchases, expenses, net-profit dashboard),
+  backend and frontend. UI in Kiswahili (default) and English. Next: Phase 4
+  (reports FR-18, notifications FR-19, audit log FR-20).
+- Infra: Docker Compose (db, redis, backend, frontend); nginx planned for
+  deployment.
 
 ## Non-negotiable architecture rules
 Full detail in docs/BBM_SRS_Summary_Draft.pdf. Summary:
@@ -25,6 +30,22 @@ Full detail in docs/BBM_SRS_Summary_Draft.pdf. Summary:
 - The sale transaction (validate stock → create sale+items → decrement
   stock → write stock movement → compute COGS/profit → record payment)
   runs in one atomic DB transaction with full rollback on any failure.
+  Receiving a purchase (batches → `PURCHASE` movements → cost update) is
+  atomic the same way.
+- No hard-coded user-visible text. Backend messages use `gettext` (`_()`)
+  with Kiswahili in `backend/locale/sw/LC_MESSAGES/django.po`; frontend text
+  uses `t()` with keys in both `src/i18n/en.ts` and `src/i18n/sw.ts`.
+  Kiswahili is simple and casual: everyday shop words.
+
+## Where to look
+- `README.md`: setup, commands, endpoints, and "Current state / next step".
+- `docs/PHASE_N_SUMMARY.md`: what each phase built, and its known gaps.
+- `.claude/rules/backend.md`, `.claude/rules/frontend.md`: detailed coding
+  rules, loaded automatically for files under `backend/` / `frontend/`.
+- Skills: `new-resource` (checklist for a new tenant-scoped model/API/page),
+  `verify` (full check suite; run before saying a change is ready).
+- Agent: `tenancy-reviewer` (review backend changes against the rules
+  above before committing).
 
 ## Working conventions
 - Plan before writing code — propose an approach, wait for my approval,

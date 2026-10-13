@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -15,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useTranslateMessage } from '@/i18n'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { applyServerErrors } from '@/lib/forms'
@@ -22,14 +24,19 @@ import { adjustmentSchema } from '@/lib/schemas'
 import type { AdjustmentInput, AdjustmentValues } from '@/lib/schemas'
 import type { Batch, MovementType, Product } from '@/lib/types'
 
-type Kind = { id: string; name: string; type: MovementType; sign: 1 | -1 }
+type Kind = {
+  id: 'received' | 'count_add' | 'damage' | 'expired' | 'count_remove'
+  type: MovementType
+  sign: 1 | -1
+}
 
+// Labels are keys: adjust.kind_<id>.
 const ADJUSTMENT_KINDS: Kind[] = [
-  { id: 'received', name: 'Stock received / opening stock', type: 'ADJUSTMENT', sign: 1 },
-  { id: 'count_add', name: 'Count correction (add)', type: 'ADJUSTMENT', sign: 1 },
-  { id: 'damage', name: 'Damaged', type: 'DAMAGE', sign: -1 },
-  { id: 'expired', name: 'Expired', type: 'EXPIRY', sign: -1 },
-  { id: 'count_remove', name: 'Count correction (remove)', type: 'ADJUSTMENT', sign: -1 },
+  { id: 'received', type: 'ADJUSTMENT', sign: 1 },
+  { id: 'count_add', type: 'ADJUSTMENT', sign: 1 },
+  { id: 'damage', type: 'DAMAGE', sign: -1 },
+  { id: 'expired', type: 'EXPIRY', sign: -1 },
+  { id: 'count_remove', type: 'ADJUSTMENT', sign: -1 },
 ]
 
 const EMPTY: AdjustmentInput = {
@@ -54,6 +61,8 @@ export function AdjustStockDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const translate = useTranslateMessage()
   const form = useForm<AdjustmentInput, unknown, AdjustmentValues>({
     resolver: zodResolver(adjustmentSchema),
     defaultValues: EMPTY,
@@ -65,9 +74,14 @@ export function AdjustStockDialog({
   const stockIn = kind.sign > 0
   // Products without expiry tracking use one automatic batch: no batch fields.
   const usesBatches = product.tracks_expiry
+  const kindOptions = ADJUSTMENT_KINDS.map((k) => ({ id: k.id, name: t(`adjust.kind_${k.id}`) }))
   const batchOptions = (stockIn ? batches : batches.filter((b) => b.stock_on_hand > 0)).map((b) => ({
     id: b.id,
-    name: `${b.batch_number} · ${b.expiry_date ? `exp. ${formatDate(b.expiry_date)}` : 'no expiry'} · ${b.stock_on_hand} left`,
+    name: t('adjust.batchOption', {
+      batch: b.batch_number,
+      expiry: b.expiry_date ? t('adjust.expiryShort', { date: formatDate(b.expiry_date) }) : t('adjust.noExpiry'),
+      count: b.stock_on_hand,
+    }),
   }))
 
   function close(next: boolean) {
@@ -77,12 +91,12 @@ export function AdjustStockDialog({
 
   async function onSubmit(values: AdjustmentValues) {
     if (usesBatches && !stockIn && !values.batch) {
-      form.setError('batch', { message: 'Choose the batch to remove stock from.' })
+      form.setError('batch', { message: 'errors.chooseBatchToRemove' })
       return
     }
     if (usesBatches && stockIn && !values.batch) {
-      if (!values.batch_number) form.setError('batch_number', { message: 'Enter the batch or lot number.' })
-      if (!values.expiry_date) form.setError('expiry_date', { message: 'Enter the expiry date.' })
+      if (!values.batch_number) form.setError('batch_number', { message: 'errors.enterBatchNumber' })
+      if (!values.expiry_date) form.setError('expiry_date', { message: 'errors.enterExpiryDate' })
       if (!values.batch_number || !values.expiry_date) return
     }
 
@@ -111,7 +125,7 @@ export function AdjustStockDialog({
       queryClient.invalidateQueries({ queryKey: ['products'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory'] }),
     ])
-    toast.success(`Stock ${stockIn ? 'added' : 'removed'}.`)
+    toast.success(stockIn ? t('adjust.added') : t('adjust.removed'))
     close(false)
   }
 
@@ -119,9 +133,9 @@ export function AdjustStockDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-h-[90svh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adjust stock</DialogTitle>
+          <DialogTitle>{t('adjust.title')}</DialogTitle>
           <DialogDescription>
-            {product.name} · {product.stock_on_hand} {product.unit} in stock
+            {t('adjust.subtitle', { name: product.name, count: product.stock_on_hand, unit: product.unit })}
           </DialogDescription>
         </DialogHeader>
 
@@ -132,14 +146,14 @@ export function AdjustStockDialog({
             name="kind"
             render={({ field }) => (
               <RefSelect
-                label="What happened?"
+                label={t('adjust.whatHappened')}
                 value={field.value}
                 onChange={(value) => {
                   field.onChange(value || 'received')
                   form.setValue('batch', '')
                 }}
-                options={ADJUSTMENT_KINDS}
-                noneLabel="Choose…"
+                options={kindOptions}
+                noneLabel={t('common.choose')}
               />
             )}
           />
@@ -151,13 +165,13 @@ export function AdjustStockDialog({
               render={({ field }) => (
                 <div className="grid gap-1.5">
                   <RefSelect
-                    label="Batch"
+                    label={t('common.batch')}
                     value={field.value}
                     onChange={field.onChange}
                     options={batchOptions}
-                    noneLabel={stockIn ? 'New batch' : 'Choose a batch'}
+                    noneLabel={stockIn ? t('adjust.newBatch') : t('adjust.chooseBatch')}
                   />
-                  {errors.batch && <p className="text-destructive text-sm">{errors.batch.message}</p>}
+                  {errors.batch && <p className="text-destructive text-sm">{translate(errors.batch.message)}</p>}
                 </div>
               )}
             />
@@ -165,23 +179,23 @@ export function AdjustStockDialog({
 
           {usesBatches && stockIn && !batchId && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Batch / lot number" error={errors.batch_number?.message}
+              <FormField label={t('adjust.batchLot')} error={errors.batch_number?.message}
                 {...form.register('batch_number')} />
-              <FormField label="Expiry date" type="date" error={errors.expiry_date?.message}
+              <FormField label={t('adjust.expiryDate')} type="date" error={errors.expiry_date?.message}
                 {...form.register('expiry_date')} />
             </div>
           )}
 
           <FormField
-            label={stockIn ? 'Quantity to add' : 'Quantity to remove'}
+            label={stockIn ? t('adjust.qtyAdd') : t('adjust.qtyRemove')}
             inputMode="numeric"
             hint={product.unit}
             error={errors.quantity?.message}
             {...form.register('quantity')}
           />
           <FormField
-            label="Note"
-            placeholder={stockIn ? 'e.g. Delivery from supplier' : 'e.g. Bottle broken on shelf'}
+            label={t('common.note')}
+            placeholder={stockIn ? t('adjust.notePlaceholderIn') : t('adjust.notePlaceholderOut')}
             error={errors.reason?.message}
             {...form.register('reason')}
           />
@@ -189,10 +203,10 @@ export function AdjustStockDialog({
 
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={() => close(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form="adjust-stock" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving…' : stockIn ? 'Add stock' : 'Remove stock'}
+            {isSubmitting ? t('common.saving') : stockIn ? t('adjust.addStock') : t('adjust.removeStock')}
           </Button>
         </DialogFooter>
       </DialogContent>

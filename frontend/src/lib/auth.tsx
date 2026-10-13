@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 
+import i18n from '@/i18n'
+
 import { api, ApiError, onAuthLost, tokenStore } from './api'
 import { AuthContext } from './auth-context'
 import type { AuthContextValue, AuthStatus, LoginInput, RegisterInput } from './auth-context'
@@ -31,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     onAuthLost(() => {
       endSession()
-      toast.info('Your session has ended. Please log in again.')
+      toast.info(i18n.t('common.sessionEnded'))
     })
     // Logging out in another tab removes the shared refresh token.
     const onStorage = (event: StorageEvent) => {

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Ref } from '@/lib/types'
@@ -11,7 +13,7 @@ export function RefSelect({
   value,
   onChange,
   options,
-  noneLabel = 'None',
+  noneLabel,
   disabled,
   hideLabel = false,
 }: {
@@ -23,6 +25,7 @@ export function RefSelect({
   disabled?: boolean
   hideLabel?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <div className="grid gap-1.5">
       <Label className={hideLabel ? 'sr-only' : undefined}>{label}</Label>
@@ -35,7 +38,7 @@ export function RefSelect({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={NONE}>{noneLabel}</SelectItem>
+          <SelectItem value={NONE}>{noneLabel ?? t('common.none')}</SelectItem>
           {options?.map((option) => (
             <SelectItem key={option.id} value={option.id}>
               {option.name}

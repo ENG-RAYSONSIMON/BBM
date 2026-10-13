@@ -5,8 +5,9 @@ paths:
 
 # Frontend rules (React / Vite / TypeScript)
 
-Commands (run in `frontend/`): `npm test` (Vitest), `npm run lint` (oxlint),
-`npm run typecheck`, `npm run build`.
+Commands: `npm test` (Vitest), `npm run lint` (oxlint), `npm run typecheck`,
+`npm run build`. Run them in the container
+(`docker compose exec frontend npm test`) or from `frontend/` locally.
 
 ## Data and API
 - All HTTP goes through `api()` in `src/lib/api.ts` — it handles the in-memory
@@ -18,6 +19,10 @@ Commands (run in `frontend/`): `npm test` (Vitest), `npm run lint` (oxlint),
 - API response types live in `src/lib/types.ts` (`Paginated<T>`, etc.) and must
   match the DRF serializers. Money arrives as decimal strings — format with
   `formatTZS` from `src/lib/format.ts`, never `parseFloat` for arithmetic.
+  Do money maths in integer cents with `src/lib/money.ts` (`toCents`,
+  `fromCents`, `cartTotals`, `tender`); purchase line totals with
+  `src/lib/purchases.ts`; date-range filters with `periodRange` from
+  `src/lib/dates.ts`.
 - Never send `business_id` in a request body or query; the token selects it.
 
 ## Forms
@@ -37,6 +42,16 @@ Commands (run in `frontend/`): `npm test` (Vitest), `npm run lint` (oxlint),
 - Must work on mobile (tables collapse to cards) and in dark mode.
 - Imports use the `@/` alias.
 
+## Languages (Kiswahili / English)
+- No hard-coded UI text. Every label, button, toast, placeholder and
+  `aria-label` goes through `t('area.key')` from `useTranslation()`, with the
+  key added to **both** `src/i18n/en.ts` and `src/i18n/sw.ts` (the type
+  fails the build if `sw.ts` misses one).
+- Swahili is simple and casual: everyday shop words, short sentences.
+- Zod messages and other non-React helpers return keys. `FormField` and
+  `FormError` translate them, and server text passes through unchanged.
+- Dates go through `formatDate` / `formatDateTime`, which follow the UI language.
+
 ## Tests
 - Vitest + Testing Library. Stub the network with `mockFetch()` from
   `src/test/fetch-mock.ts` (keys like `'GET /products/'`), render with
@@ -44,3 +59,5 @@ Commands (run in `frontend/`): `npm test` (Vitest), `npm run lint` (oxlint),
   `src/test/render.tsx`, and reuse `src/test/fixtures.ts`.
 - New pages get tests for loading/empty/error states, permission gating, and
   server validation errors on forms.
+- Tests run in English: `src/test/setup.ts` switches the language before each
+  test. Kiswahili has its own tests (`src/i18n/i18n.test.ts`).

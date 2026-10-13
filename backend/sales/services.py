@@ -26,9 +26,11 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from accounts.models import BusinessSettings
 from catalog.models import ProductBatch
+from expenses.services import expenses_total
 from inventory.models import StockMovement
 from inventory.services import record_movement, with_batch_stock
 
@@ -106,7 +108,8 @@ def sales_summary(date_from, date_to):
     """FR-16/FR-17 figures for local dates date_from..date_to (inclusive).
     Void sales are left out. Profit counts when the sale happens, even on
     credit; cash_collected is what actually came in (payments − refunds) in
-    the range, and outstanding_credit is everything still owed, all time."""
+    the range, and outstanding_credit is everything still owed, all time.
+    Net profit is gross profit minus the expenses dated in the range."""
     in_range = {"created_at__date__gte": date_from, "created_at__date__lte": date_to}
     totals = Sale.objects.filter(status=Sale.Status.COMPLETED, **in_range).aggregate(
         sales_count=Count("id"),
@@ -134,11 +137,15 @@ def sales_summary(date_from, date_to):
         sum=Coalesce(Sum("total"), Value(ZERO), output_field=MONEY)
     )["sum"]
     owed_paid = net(Payment.objects.filter(sale__status=Sale.Status.COMPLETED))
+    gross_profit = totals["revenue"] - totals["cogs"]
+    expenses = expenses_total(date_from, date_to)
     return {
         "date_from": date_from,
         "date_to": date_to,
         **totals,
-        "gross_profit": totals["revenue"] - totals["cogs"],
+        "gross_profit": gross_profit,
+        "expenses": expenses,
+        "net_profit": gross_profit - expenses,
         "cash_collected": net(Payment.objects.filter(**in_range)),
         "outstanding_credit": owed_total - owed_paid,
     }
@@ -160,25 +167,32 @@ def _sellable_batches(product, today):
 def _price_lines(lines):
     """Validate the requested lines and compute their snapshot amounts."""
     if not lines:
-        raise ValidationError({"items": ["Add at least one product to the sale."]})
+        raise ValidationError({"items": [_("Add at least one product to the sale.")]})
     seen = set()
     priced = []
     for index, line in enumerate(lines):
         product, quantity = line["product"], line["quantity"]
         discount = _money(line.get("discount") or 0)
         if product.pk in seen:
-            raise ValidationError({"items": [f"{product.name} is listed twice. Use one line per product."]})
+            raise ValidationError(
+                {"items": [_("%(name)s is listed twice. Use one line per product.") % {"name": product.name}]}
+            )
         seen.add(product.pk)
         if not product.is_active:
-            raise ValidationError({"items": [f"{product.name} is archived and can't be sold."]})
+            raise ValidationError({"items": [_("%(name)s is archived and can't be sold.") % {"name": product.name}]})
         if quantity <= 0:
-            raise ValidationError({"items": [f"{product.name}: quantity must be at least 1."]})
+            raise ValidationError({"items": [_("%(name)s: quantity must be at least 1.") % {"name": product.name}]})
         unit_price = _money(product.selling_price)
         unit_cost = _money(product.cost_price)
         gross = unit_price * quantity
         if discount < 0 or discount > gross:
             raise ValidationError(
-                {"items": [f"{product.name}: the discount must be between 0 and {gross:,.2f}."]}
+                {
+                    "items": [
+                        _("%(name)s: the discount must be between 0 and %(max)s.")
+                        % {"name": product.name, "max": f"{gross:,.2f}"}
+                    ]
+                }
             )
         priced.append(
             {
@@ -205,7 +219,7 @@ def create_sale(*, user, lines, customer=None, new_customer=None, amount_receive
     customer (an existing one, or `new_customer` {name, phone})."""
     amount_received = _money(amount_received)
     if amount_received < 0:
-        raise ValidationError({"amount_received": ["Enter the cash received (0 or more)."]})
+        raise ValidationError({"amount_received": [_("Enter the cash received (0 or more).")]})
     priced = _price_lines(lines)
     subtotal = sum((line["unit_price"] * line["quantity"] for line in priced), ZERO)
     discount_total = sum((line["discount"] for line in priced), ZERO)
@@ -214,7 +228,7 @@ def create_sale(*, user, lines, customer=None, new_customer=None, amount_receive
 
     if paid < total and customer is None and not new_customer:
         raise ValidationError(
-            {"customer": ["The cash received is less than the total. Choose the customer who owes the rest."]}
+            {"customer": [_("The cash received is less than the total. Choose the customer who owes the rest.")]}
         )
 
     # Serialises receipt numbers per business: the settings row is the lock.
@@ -232,7 +246,9 @@ def create_sale(*, user, lines, customer=None, new_customer=None, amount_receive
         line["batches"] = batches
         available = sum(batch.stock_on_hand for batch in batches)
         if line["quantity"] > available:
-            shortages.append(f"{line['product'].name}: only {available} available to sell.")
+            shortages.append(
+                _("%(name)s: only %(count)s available to sell.") % {"name": line["product"].name, "count": available}
+            )
     if shortages:
         raise ValidationError({"items": shortages})
 
@@ -302,11 +318,11 @@ def record_payment(*, sale, user, amount_received, note=""):
     amount_received = _money(amount_received)
     sale = _locked_with_totals(sale)
     if sale.status == Sale.Status.VOID:
-        raise ValidationError("This sale is void.")
+        raise ValidationError(_("This sale is void."))
     if sale.balance <= 0:
-        raise ValidationError("Nothing is owed on this sale.")
+        raise ValidationError(_("Nothing is owed on this sale."))
     if amount_received <= 0:
-        raise ValidationError({"amount_received": ["Enter the cash received."]})
+        raise ValidationError({"amount_received": [_("Enter the cash received.")]})
     amount = min(amount_received, sale.balance)
     return Payment.objects.create(
         sale=sale,
@@ -325,10 +341,10 @@ def void_sale(*, sale, user, reason):
     as VOID. Nothing is deleted."""
     reason = (reason or "").strip()
     if not reason:
-        raise ValidationError({"reason": ["Say why the sale is being voided."]})
+        raise ValidationError({"reason": [_("Say why the sale is being voided.")]})
     sale = _locked_with_totals(sale)
     if sale.status == Sale.Status.VOID:
-        raise ValidationError("This sale is already void.")
+        raise ValidationError(_("This sale is already void."))
 
     movement_reason = f"Void of {sale.receipt_number}: {reason}"[:255]
     allocations = SaleItemAllocation.objects.filter(sale_item__sale=sale).select_related(

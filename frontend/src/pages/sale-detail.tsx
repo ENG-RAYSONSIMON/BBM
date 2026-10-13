@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftIcon, BanIcon, PlusIcon, WalletIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { PaymentStatusBadge } from '@/components/payment-status-badge'
@@ -20,12 +21,13 @@ import type { SaleDetail } from '@/lib/types'
 export function SaleDetailPage() {
   const { id = '' } = useParams()
   const { can } = useAuth()
+  const { t } = useTranslation()
   const [dialog, setDialog] = useState<'pay' | 'void' | null>(null)
   const query = useQuery({ queryKey: ['sale', id], queryFn: () => api<SaleDetail>(`/sales/${id}/`) })
 
   if (query.isPending) {
     return (
-      <div className="mx-auto grid max-w-4xl gap-4" role="status" aria-label="Loading sale">
+      <div className="mx-auto grid max-w-4xl gap-4" role="status" aria-label={t('sales.loadingSale')}>
         <Skeleton className="h-10 w-1/2" />
         <Skeleton className="h-64" />
       </div>
@@ -36,7 +38,7 @@ export function SaleDetailPage() {
       <div className="mx-auto grid max-w-4xl justify-items-start gap-3">
         <FormError message={query.error.message} />
         <Button variant="outline" size="lg" asChild>
-          <Link to="/sales">Back to sales</Link>
+          <Link to="/sales">{t('sales.backToSales')}</Link>
         </Button>
       </div>
     )
@@ -47,11 +49,13 @@ export function SaleDetailPage() {
   const owes = Number(sale.balance) > 0
   const refund = sale.payments.find((p) => p.kind === 'REFUND')
   const totals: [string, string, boolean?][] = [
-    ['Subtotal', formatTZS(sale.subtotal)],
-    ...(Number(sale.discount_total) > 0 ? ([['Discount', `−${formatTZS(sale.discount_total)}`]] as [string, string][]) : []),
-    ['Total', formatTZS(sale.total), true],
-    ['Paid', formatTZS(sale.amount_paid)],
-    ...(isVoid ? [] : ([['Still owed', formatTZS(sale.balance), true]] as [string, string, boolean][])),
+    [t('common.subtotal'), formatTZS(sale.subtotal)],
+    ...(Number(sale.discount_total) > 0
+      ? ([[t('common.discount'), `−${formatTZS(sale.discount_total)}`]] as [string, string][])
+      : []),
+    [t('common.total'), formatTZS(sale.total), true],
+    [t('sales.paid'), formatTZS(sale.amount_paid)],
+    ...(isVoid ? [] : ([[t('sales.stillOwed'), formatTZS(sale.balance), true]] as [string, string, boolean][])),
   ]
 
   return (
@@ -59,7 +63,7 @@ export function SaleDetailPage() {
       <Button variant="ghost" size="sm" className="justify-self-start" asChild>
         <Link to="/sales">
           <ArrowLeftIcon />
-          Sales
+          {t('sales.title')}
         </Link>
       </Button>
 
@@ -70,11 +74,11 @@ export function SaleDetailPage() {
             <PaymentStatusBadge status={sale.payment_status} />
           </div>
           <p className="text-muted-foreground">
-            {formatDateTime(sale.created_at)} · sold by {sale.sold_by_name}
+            {t('sales.soldBy', { date: formatDateTime(sale.created_at), name: sale.sold_by_name })}
           </p>
           {sale.customer && (
             <p className="mt-1">
-              Customer:{' '}
+              {t('sales.customerFilter')}{' '}
               <Link className="font-medium underline-offset-4 hover:underline" to={`/sales?customer=${sale.customer}`}>
                 {sale.customer_name}
               </Link>
@@ -86,21 +90,21 @@ export function SaleDetailPage() {
           {!isVoid && owes && can(PERMISSIONS.salesCreate) && (
             <Button size="lg" onClick={() => setDialog('pay')}>
               <WalletIcon />
-              Record payment
+              {t('sales.recordPayment')}
             </Button>
           )}
           {can(PERMISSIONS.salesCreate) && (
             <Button variant="outline" size="lg" asChild>
               <Link to="/pos">
                 <PlusIcon />
-                New sale
+                {t('sales.newSale')}
               </Link>
             </Button>
           )}
           {!isVoid && can(PERMISSIONS.salesVoid) && (
             <Button variant="destructive" size="lg" onClick={() => setDialog('void')}>
               <BanIcon />
-              Void
+              {t('sales.void')}
             </Button>
           )}
         </div>
@@ -108,21 +112,24 @@ export function SaleDetailPage() {
 
       {isVoid && (
         <Card className="border-destructive/40 p-4 text-sm">
-          Voided {sale.voided_at && formatDateTime(sale.voided_at)}
-          {sale.voided_by_name && ` by ${sale.voided_by_name}`}: {sale.void_reason}. The items went back into stock
-          {refund && ` and ${formatTZS(refund.amount)} was refunded`}.
+          {t('sales.voidedText', {
+            date: sale.voided_at ? formatDateTime(sale.voided_at) : '',
+            by: sale.voided_by_name ? t('sales.voidedBy', { name: sale.voided_by_name }) : '',
+            reason: sale.void_reason,
+            refund: refund ? t('sales.voidedRefund', { amount: formatTZS(refund.amount) }) : '',
+          })}
         </Card>
       )}
 
       <Card className="py-0">
-        <Table aria-label="Items">
+        <Table aria-label={t('common.items')}>
           <TableHeader>
             <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Price</TableHead>
-              <TableHead className="text-right">Discount</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <TableHead>{t('common.item')}</TableHead>
+              <TableHead className="text-right">{t('common.qty')}</TableHead>
+              <TableHead className="text-right">{t('common.price')}</TableHead>
+              <TableHead className="text-right">{t('common.discount')}</TableHead>
+              <TableHead className="text-right">{t('common.amount')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -151,7 +158,7 @@ export function SaleDetailPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Totals</CardTitle>
+            <CardTitle>{t('sales.totals')}</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 text-sm">
@@ -163,31 +170,31 @@ export function SaleDetailPage() {
               ))}
               {!isVoid && (
                 <>
-                  <dt className="text-muted-foreground border-t pt-2">Cost of goods</dt>
+                  <dt className="text-muted-foreground border-t pt-2">{t('sales.costOfGoods')}</dt>
                   <dd className="border-t pt-2 text-right tabular-nums">{formatTZS(sale.cost_total)}</dd>
-                  <dt className="text-muted-foreground">Gross profit</dt>
+                  <dt className="text-muted-foreground">{t('sales.grossProfit')}</dt>
                   <dd className="text-right tabular-nums">{formatTZS(sale.gross_profit)}</dd>
                 </>
               )}
             </dl>
-            {sale.note && <p className="text-muted-foreground mt-3 text-sm">Note: {sale.note}</p>}
+            {sale.note && <p className="text-muted-foreground mt-3 text-sm">{t('sales.noteText', { note: sale.note })}</p>}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Payments</CardTitle>
+            <CardTitle>{t('sales.payments')}</CardTitle>
           </CardHeader>
           <CardContent>
             {sale.payments.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No cash received yet.</p>
+              <p className="text-muted-foreground text-sm">{t('sales.noCashYet')}</p>
             ) : (
-              <ul className="divide-y text-sm" aria-label="Payments">
+              <ul className="divide-y text-sm" aria-label={t('sales.payments')}>
                 {sale.payments.map((payment) => (
                   <li key={payment.id} className="grid gap-0.5 py-2">
                     <div className="flex justify-between gap-2">
                       <span className="font-medium">
-                        {payment.kind === 'REFUND' ? 'Refund' : 'Cash payment'}
+                        {payment.kind === 'REFUND' ? t('sales.refund') : t('sales.cashPayment')}
                       </span>
                       <span className={payment.kind === 'REFUND' ? 'text-destructive tabular-nums' : 'tabular-nums'}>
                         {payment.kind === 'REFUND' ? '−' : ''}
@@ -197,7 +204,10 @@ export function SaleDetailPage() {
                     <p className="text-muted-foreground">
                       {formatDateTime(payment.created_at)} · {payment.received_by_name}
                       {Number(payment.change_given) > 0 &&
-                        ` · received ${formatTZS(payment.amount_received)}, change ${formatTZS(payment.change_given)}`}
+                        t('sales.receivedChange', {
+                          received: formatTZS(payment.amount_received),
+                          change: formatTZS(payment.change_given),
+                        })}
                     </p>
                     {payment.note && <p>{payment.note}</p>}
                   </li>

@@ -23,19 +23,29 @@ docker compose exec backend python manage.py spectacular --validate --fail-on-wa
 
 - `makemigrations --check` failing means a model change has no migration —
   tell the user; don't generate one without saying so.
+- `sales.tests.test_i18n` fails if a server message has no Kiswahili or
+  `django.mo` is stale: fill in `backend/locale/sw/LC_MESSAGES/django.po`
+  and run `compilemessages -l sw --ignore='venv/*'` (README §7). Don't skip it.
 - To narrow a failure, run one app or module, e.g.
   `docker compose exec backend python manage.py test inventory.tests.test_isolation`.
 
 ## Frontend
 
-Only if anything under `frontend/` changed (check `git status`):
+Only if anything under `frontend/` changed (check `git status`). Prefer the
+container when it's up:
 
 ```bash
-cd frontend && npm test && npm run lint && npm run build
+docker compose exec frontend npm test
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run build
 ```
+
+Otherwise run `npm test && npm run lint && npm run build` from `frontend/`.
+`build` type-checks too, including that `sw.ts` has every key in `en.ts`.
 
 ## Report
 
-Finish with a short table: step → pass/fail, plus test counts. Then list the
+Finish with a short table: step → pass/fail, plus backend and frontend test
+counts. If the counts differ from README §4, say so (README should be updated). Then list the
 manual checks the user should do for this change (per CLAUDE.md: "tell me
 what to test and how before I commit").

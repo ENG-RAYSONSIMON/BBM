@@ -10,7 +10,8 @@ report findings.
 Start with `git status` and `git diff` (plus untracked files under
 `backend/`) to see what changed. Read the changed files fully, and the
 relevant parts of `core/models.py`, `core/managers.py`, `core/views.py`,
-`core/permissions.py` and `inventory/services.py` as reference.
+`core/permissions.py`, `inventory/services.py`, `sales/services.py` and
+`purchases/services.py` as reference.
 
 Check each item and report only concrete violations with `file:line`, why it
 breaks the rule, and the fix:
@@ -28,11 +29,13 @@ breaks the rule, and the fix:
    - No stock column or cached stock count.
    - Stock changes only via `inventory.services.record_movement()`.
    - No update/delete of `StockMovement` (including `QuerySet.update/delete`).
+   - Purchase drafts never write stock; only receiving does.
 3. **Snapshots**: sale/purchase items store unit price and cost at
    transaction time; profit/COGS never read current `Product` prices.
 4. **Atomicity**: multi-step money/stock flows run in one
    `transaction.atomic()`; nothing commits partially; rows that are read then
-   decremented are locked (`select_for_update`).
+   decremented are locked (`select_for_update`). Applies to sales, voids,
+   payments and purchase receiving.
 5. **Permissions**: every new view declares `required_permissions`; new
    codenames exist in `accounts/rbac.py` and in a data migration.
 6. **Money**: `Decimal` / `DecimalField`, never `float`.
@@ -40,6 +43,11 @@ breaks the rule, and the fix:
    endpoints have 403 tests; atomic flows have a rollback test.
 8. **Secrets**: no real secrets in code, settings, migrations or
    `.env.example` (must be `REPLACE_ME`).
+9. **Private files**: receipts and other private uploads are validated,
+   stored outside `MEDIA_ROOT` (`PrivateStorage` / `PRIVATE_MEDIA_ROOT`),
+   and served only through permissioned, tenant-scoped views.
+10. **Messages** (lower priority): user-visible strings use `_()` /
+    `gettext_lazy` with named placeholders, never f-strings.
 
 End with a verdict: "No violations found" or a ranked list, most severe first.
 Don't pad with style nitpicks.

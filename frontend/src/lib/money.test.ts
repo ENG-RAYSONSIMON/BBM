@@ -22,7 +22,7 @@ describe('money', () => {
 
   it('flags a discount larger than its line', () => {
     const totals = cartTotals([{ unitPrice: '100.00', quantity: 1, discount: '101' }])
-    expect(totals.lineErrors[0]).toBe('The discount is more than the line.')
+    expect(totals.lineErrors[0]).toBe('errors.discountTooBig')
     expect(totals.total).toBe(10_000)
   })
 

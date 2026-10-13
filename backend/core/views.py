@@ -1,11 +1,12 @@
 from django.db.models import ProtectedError
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status, viewsets
 from rest_framework.exceptions import APIException
 
 
 class Conflict(APIException):
     status_code = status.HTTP_409_CONFLICT
-    default_detail = "This record is in use and cannot be deleted."
+    default_detail = _("This record is in use and cannot be deleted.")
     default_code = "conflict"
 
 

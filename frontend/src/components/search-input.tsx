@@ -1,5 +1,6 @@
 import { SearchIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils'
 export function SearchInput({
   value,
   onChange,
-  placeholder = 'Search…',
+  placeholder: placeholderProp,
   className,
 }: {
   value: string
@@ -16,6 +17,8 @@ export function SearchInput({
   placeholder?: string
   className?: string
 }) {
+  const { t } = useTranslation()
+  const placeholder = placeholderProp ?? t('common.search')
   const [draft, setDraft] = useState(value)
   const [lastValue, setLastValue] = useState(value)
 

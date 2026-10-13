@@ -6,6 +6,8 @@
  * refresh token once (shared by concurrent requests) and retries the request.
  */
 
+import i18n, { currentLanguage } from '@/i18n'
+
 export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1').replace(
   /\/$/,
   '',
@@ -38,14 +40,15 @@ export class ApiError extends Error {
 }
 
 function errorMessage(status: number, data: ApiErrorData): string {
-  if (status === 0) return 'Could not reach the server. Check your connection and try again.'
-  if (status === 429) return 'Too many attempts. Please wait a minute and try again.'
+  if (status === 0) return i18n.t('errors.network')
+  if (status === 429) return i18n.t('errors.tooMany')
+  // Server text arrives already in the user's language (Accept-Language).
   const detail = data?.detail
   if (typeof detail === 'string') return detail
   const nonField = data?.non_field_errors
   if (Array.isArray(nonField) && typeof nonField[0] === 'string') return nonField[0]
-  if (status >= 500) return 'Something went wrong on our side. Please try again.'
-  return 'Request failed.'
+  if (status >= 500) return i18n.t('errors.server')
+  return i18n.t('errors.requestFailed')
 }
 
 // ---- token store -----------------------------------------------------------
@@ -155,9 +158,21 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return data as T
 }
 
+/** Download a protected file (e.g. an expense receipt) with the session token. */
+export async function apiBlob(path: string): Promise<Blob> {
+  if (!accessToken && readRefresh()) await refreshTokens()
+  let res = await send(path, 'GET', undefined, true)
+  if (res.status === 401 && readRefresh()) {
+    if (await refreshTokens()) res = await send(path, 'GET', undefined, true)
+  }
+  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null))
+  return res.blob()
+}
+
 async function send(path: string, method: string, body: unknown, auth: boolean) {
   const isForm = body instanceof FormData
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  // The server answers in the user's language (messages, validation errors).
+  const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': currentLanguage() }
   // For FormData the browser sets the multipart Content-Type and boundary.
   if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`

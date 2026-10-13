@@ -53,6 +53,11 @@ export const PERMISSIONS = {
   salesView: 'sales.view',
   salesCreate: 'sales.create',
   salesVoid: 'sales.void',
+  purchasesView: 'purchases.view',
+  purchasesManage: 'purchases.manage',
+  expensesView: 'expenses.view',
+  expensesManage: 'expenses.manage',
+  expensesDelete: 'expenses.delete',
 } as const
 
 /** DRF page-number pagination envelope. */
@@ -249,4 +254,86 @@ export type SalesSummary = {
   cash_collected: string
   /** Still owed on all sales, all time. */
   outstanding_credit: string
+  /** Expenses dated in the range; null without expenses.view. */
+  expenses: string | null
+  /** Gross profit − expenses; null without expenses.view. */
+  net_profit: string | null
+}
+
+// ---- Phase 3 step 2: purchases and expenses --------------------------------
+
+export type PurchaseStatus = 'DRAFT' | 'RECEIVED' | 'CANCELLED'
+
+export type Purchase = {
+  id: string
+  number: number
+  purchase_number: string
+  status: PurchaseStatus
+  supplier: string | null
+  supplier_name: string | null
+  reference: string
+  purchase_date: string
+  note: string
+  total: string
+  item_count: number
+  created_by: string
+  created_by_name: string
+  received_at: string | null
+  created_at: string
+}
+
+export type PurchaseItem = {
+  id: string
+  product: string
+  product_name: string
+  tracks_expiry: boolean
+  quantity: number
+  unit_cost: string
+  line_total: string
+  batch_number: string
+  expiry_date: string | null
+  /** Set once the purchase is received. */
+  batch: string | null
+}
+
+export type PurchaseDetail = Purchase & {
+  items: PurchaseItem[]
+  received_by: string | null
+  received_by_name: string
+  cancelled_at: string | null
+  cancelled_by: string | null
+  cancelled_by_name: string
+  cancel_reason: string
+}
+
+export type ExpenseCategory = {
+  id: string
+  name: string
+  description: string
+  created_at: string
+  updated_at: string
+}
+
+export type Expense = {
+  id: string
+  category: string
+  category_name: string
+  amount: string
+  expense_date: string
+  description: string
+  paid_to: string
+  method: 'CASH'
+  has_receipt: boolean
+  recorded_by: string
+  recorded_by_name: string
+  created_at: string
+  updated_at: string
+}
+
+export type ExpensesSummary = {
+  date_from: string
+  date_to: string
+  total: string
+  count: number
+  by_category: { category: string; category_name: string; total: string; count: number }[]
 }

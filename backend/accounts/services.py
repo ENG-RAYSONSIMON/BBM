@@ -69,6 +69,10 @@ def register_owner(*, email, password, business_name, first_name="", last_name="
         roles = seed_default_roles()
         UserRole.objects.create(user=user, role=roles[Role.OWNER])
         BusinessSettings.objects.create()
+        # Imported here: accounts loads before the apps that depend on it.
+        from expenses.services import seed_default_categories
+
+        seed_default_categories()
     return user, business
 
 

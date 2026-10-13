@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router'
 import type { Location } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -18,6 +19,7 @@ import type { BusinessChoice } from '@/lib/types'
 
 export function LoginPage() {
   const { login } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: Location } | null)?.from?.pathname ?? '/'
@@ -42,7 +44,7 @@ export function LoginPage() {
         return
       }
       if (error instanceof ApiError && error.status === 401) {
-        form.setError('root.server', { message: 'Incorrect email or password.' })
+        form.setError('root.server', { message: 'auth.wrongLogin' })
         return
       }
       applyServerErrors(error, form.setError, ['email', 'password'])
@@ -51,7 +53,7 @@ export function LoginPage() {
 
   if (businesses) {
     return (
-      <AuthLayout title="Choose a business" description="Your account belongs to more than one business.">
+      <AuthLayout title={t('auth.chooseBusiness')} description={t('auth.manyBusinesses')}>
         <div className="grid gap-2">
           <FormError message={errors.root?.server?.message} />
           {businesses.map((business) => (
@@ -68,7 +70,7 @@ export function LoginPage() {
             </Button>
           ))}
           <Button variant="link" onClick={() => setBusinesses(null)}>
-            Use a different account
+            {t('auth.differentAccount')}
           </Button>
         </div>
       </AuthLayout>
@@ -77,13 +79,13 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Log in"
-      description="Welcome back. Log in to manage your business."
+      title={t('auth.login')}
+      description={t('auth.loginWelcome')}
       footer={
         <>
-          New to BBM?{' '}
+          {t('auth.newToBbm')}{' '}
           <Link to="/register" className="text-foreground font-medium underline-offset-4 hover:underline">
-            Create an account
+            {t('auth.createAccount')}
           </Link>
         </>
       }
@@ -91,7 +93,7 @@ export function LoginPage() {
       <form className="grid gap-4" noValidate onSubmit={form.handleSubmit((values) => submit(values))}>
         <FormError message={errors.root?.server?.message} />
         <FormField
-          label="Email"
+          label={t('common.email')}
           type="email"
           autoComplete="email"
           error={errors.email?.message}
@@ -99,7 +101,7 @@ export function LoginPage() {
         />
         <div className="grid gap-1.5">
           <FormField
-            label="Password"
+            label={t('auth.password')}
             type="password"
             autoComplete="current-password"
             error={errors.password?.message}
@@ -109,11 +111,11 @@ export function LoginPage() {
             to="/forgot-password"
             className="text-muted-foreground justify-self-end text-sm underline-offset-4 hover:underline"
           >
-            Forgot password?
+            {t('auth.forgotPassword')}
           </Link>
         </div>
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Logging in…' : 'Log in'}
+          {isSubmitting ? t('auth.loggingIn') : t('auth.login')}
         </Button>
       </form>
     </AuthLayout>

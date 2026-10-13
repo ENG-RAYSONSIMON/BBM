@@ -21,6 +21,11 @@ INVENTORY_ADJUST = "inventory.adjust"
 SALES_VIEW = "sales.view"
 SALES_CREATE = "sales.create"
 SALES_VOID = "sales.void"
+PURCHASES_VIEW = "purchases.view"
+PURCHASES_MANAGE = "purchases.manage"
+EXPENSES_VIEW = "expenses.view"
+EXPENSES_MANAGE = "expenses.manage"
+EXPENSES_DELETE = "expenses.delete"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
@@ -33,6 +38,11 @@ PERMISSIONS = {
     SALES_VIEW: "View sales, payments, customers and sales totals.",
     SALES_CREATE: "Record sales and customer payments, and manage customers.",
     SALES_VOID: "Void a sale, returning its stock and refunding its payments.",
+    PURCHASES_VIEW: "View purchases from suppliers.",
+    PURCHASES_MANAGE: "Create, edit, receive and cancel purchases.",
+    EXPENSES_VIEW: "View expenses, expense categories and expense totals.",
+    EXPENSES_MANAGE: "Record and edit expenses and their receipts, and manage expense categories.",
+    EXPENSES_DELETE: "Delete expenses and expense categories.",
 }
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -47,6 +57,10 @@ DEFAULT_ROLE_PERMISSIONS = {
             INVENTORY_ADJUST,
             SALES_VIEW,
             SALES_CREATE,
+            PURCHASES_VIEW,
+            PURCHASES_MANAGE,
+            EXPENSES_VIEW,
+            EXPENSES_MANAGE,
         }
     ),
 }

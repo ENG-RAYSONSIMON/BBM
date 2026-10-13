@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -13,6 +14,7 @@ import type { RegisterValues } from '@/lib/schemas'
 
 export function RegisterPage() {
   const { register: registerOwner } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const form = useForm<RegisterValues>({
@@ -54,13 +56,13 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Create your business account"
-      description="You'll be the owner. You can add staff later."
+      title={t('auth.registerTitle')}
+      description={t('auth.registerText')}
       footer={
         <>
-          Already have an account?{' '}
+          {t('auth.haveAccount')}{' '}
           <Link to="/login" className="text-foreground font-medium underline-offset-4 hover:underline">
-            Log in
+            {t('auth.login')}
           </Link>
         </>
       }
@@ -68,27 +70,27 @@ export function RegisterPage() {
       <form className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         <FormError message={errors.root?.server?.message} />
         <FormField
-          label="Business name"
+          label={t('auth.businessName')}
           autoComplete="organization"
           error={errors.business_name?.message}
           {...form.register('business_name')}
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
-            label="First name"
+            label={t('auth.firstName')}
             autoComplete="given-name"
             error={errors.first_name?.message}
             {...form.register('first_name')}
           />
           <FormField
-            label="Last name"
+            label={t('auth.lastName')}
             autoComplete="family-name"
             error={errors.last_name?.message}
             {...form.register('last_name')}
           />
         </div>
         <FormField
-          label="Phone (optional)"
+          label={t('auth.phoneOptional')}
           type="tel"
           autoComplete="tel"
           placeholder="+255…"
@@ -96,29 +98,29 @@ export function RegisterPage() {
           {...form.register('phone')}
         />
         <FormField
-          label="Email"
+          label={t('common.email')}
           type="email"
           autoComplete="email"
           error={errors.email?.message}
           {...form.register('email')}
         />
         <FormField
-          label="Password"
+          label={t('auth.password')}
           type="password"
           autoComplete="new-password"
-          hint="At least 8 characters. Avoid common or all-number passwords."
+          hint={t('auth.passwordHint')}
           error={errors.password?.message}
           {...form.register('password')}
         />
         <FormField
-          label="Confirm password"
+          label={t('auth.confirmPassword')}
           type="password"
           autoComplete="new-password"
           error={errors.confirm_password?.message}
           {...form.register('confirm_password')}
         />
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating account…' : 'Create account'}
+          {isSubmitting ? t('auth.creatingAccount') : t('auth.createAccountButton')}
         </Button>
       </form>
     </AuthLayout>

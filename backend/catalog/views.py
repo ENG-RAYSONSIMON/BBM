@@ -3,6 +3,7 @@ import uuid
 import django_filters
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
@@ -52,7 +53,7 @@ class CategoryViewSet(TenantModelViewSet):
     required_permissions = CATALOG_PERMISSIONS
     search_fields = ("name",)
     ordering_fields = ("name", "created_at")
-    protected_message = "This category still has products. Move them to another category first."
+    protected_message = _("This category still has products. Move them to another category first.")
 
 
 @_crud_schema("brand")
@@ -62,7 +63,7 @@ class BrandViewSet(TenantModelViewSet):
     required_permissions = CATALOG_PERMISSIONS
     search_fields = ("name",)
     ordering_fields = ("name", "created_at")
-    protected_message = "This brand still has products. Move them to another brand first."
+    protected_message = _("This brand still has products. Move them to another brand first.")
 
 
 @_crud_schema("supplier")
@@ -72,7 +73,7 @@ class SupplierViewSet(TenantModelViewSet):
     required_permissions = CATALOG_PERMISSIONS
     search_fields = ("name", "contact_person", "phone", "email")
     ordering_fields = ("name", "created_at")
-    protected_message = "This supplier still has products. Move them to another supplier first."
+    protected_message = _("This supplier still has products. Move them to another supplier first.")
 
 
 class ProductFilter(django_filters.FilterSet):
@@ -121,7 +122,7 @@ class ProductViewSet(TenantModelViewSet):
     @transaction.atomic
     def perform_destroy(self, instance):
         if instance.stock_movements.exists():
-            raise Conflict("This product has stock history and can't be deleted. Archive it instead.")
+            raise Conflict(_("This product has stock history and can't be deleted. Archive it instead."))
         storage, image_name = instance.image.storage, instance.image.name
         instance.batches.all().delete()  # empty batches only: no movements
         instance.delete()

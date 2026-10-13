@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -21,26 +22,27 @@ const SETTINGS_KEY = ['settings'] as const
 
 export function SettingsPage() {
   const { me } = useAuth()
+  const { t } = useTranslation()
   if (!me) return null
 
   const { business } = me
   const profile: [string, string][] = [
-    ['Name', business.name],
-    ['Currency', business.currency],
-    ['TIN', business.tin],
-    ['Phone', business.phone],
-    ['Email', business.email],
-    ['Address', business.address],
+    [t('common.name'), business.name],
+    [t('settings.currency'), business.currency],
+    [t('settings.tin'), business.tin],
+    [t('common.phone'), business.phone],
+    [t('common.email'), business.email],
+    [t('common.address'), business.address],
   ]
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Business profile</CardTitle>
-          <CardDescription>Editing the profile is coming soon.</CardDescription>
+          <CardTitle>{t('settings.profile')}</CardTitle>
+          <CardDescription>{t('settings.profileSoon')}</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[8rem_1fr]">
@@ -61,6 +63,7 @@ export function SettingsPage() {
 
 function BusinessSettingsCard() {
   const { can } = useAuth()
+  const { t } = useTranslation()
   const canManage = can(PERMISSIONS.settingsManage)
   const queryClient = useQueryClient()
 
@@ -85,7 +88,7 @@ function BusinessSettingsCard() {
       }),
     onSuccess: (data) => {
       queryClient.setQueryData(SETTINGS_KEY, data)
-      toast.success('Settings saved.')
+      toast.success(t('settings.saved'))
     },
   })
 
@@ -100,18 +103,14 @@ function BusinessSettingsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Stock and tax</CardTitle>
-        <CardDescription>
-          {canManage
-            ? 'These apply to everyone in your business.'
-            : 'Only users allowed to manage settings can change these.'}
-        </CardDescription>
+        <CardTitle>{t('settings.stockTax')}</CardTitle>
+        <CardDescription>{canManage ? t('settings.appliesToAll') : t('settings.onlyManagers')}</CardDescription>
       </CardHeader>
       <CardContent>
         {!can(PERMISSIONS.settingsView) || (query.error instanceof ApiError && query.error.status === 403) ? (
-          <p className="text-muted-foreground text-sm">You don't have access to business settings.</p>
+          <p className="text-muted-foreground text-sm">{t('settings.noAccess')}</p>
         ) : query.isPending ? (
-          <div className="grid gap-4" role="status" aria-label="Loading settings">
+          <div className="grid gap-4" role="status" aria-label={t('settings.loadingSettings')}>
             <Skeleton className="h-14" />
             <Skeleton className="h-14" />
             <Skeleton className="h-14" />
@@ -120,7 +119,7 @@ function BusinessSettingsCard() {
           <div className="grid justify-items-start gap-3">
             <FormError message={query.error.message} />
             <Button variant="outline" size="lg" onClick={() => query.refetch()}>
-              Try again
+              {t('common.tryAgain')}
             </Button>
           </div>
         ) : (
@@ -128,25 +127,25 @@ function BusinessSettingsCard() {
             <FormError message={errors.root?.server?.message} />
             <fieldset disabled={!canManage} className="grid gap-4 sm:grid-cols-2">
               <FormField
-                label="Low-stock alert at"
+                label={t('settings.lowStockAt')}
                 type="number"
                 inputMode="numeric"
                 min={0}
-                hint="Units left before a product counts as low stock."
+                hint={t('settings.lowStockHint')}
                 error={errors.low_stock_threshold?.message}
                 {...form.register('low_stock_threshold', { valueAsNumber: true })}
               />
               <FormField
-                label="Expiry warning (days)"
+                label={t('settings.expiryWarning')}
                 type="number"
                 inputMode="numeric"
                 min={0}
-                hint="Warn this many days before a batch expires."
+                hint={t('settings.expiryWarningHint')}
                 error={errors.expiry_warning_days?.message}
                 {...form.register('expiry_warning_days', { valueAsNumber: true })}
               />
               <FormField
-                label="Tax rate (%)"
+                label={t('settings.taxRate')}
                 type="number"
                 inputMode="decimal"
                 min={0}
@@ -159,7 +158,7 @@ function BusinessSettingsCard() {
             {canManage && (
               <div className="flex gap-2">
                 <Button type="submit" size="lg" disabled={!isDirty || isSubmitting}>
-                  {isSubmitting ? 'Saving…' : 'Save changes'}
+                  {isSubmitting ? t('common.saving') : t('common.saveChanges')}
                 </Button>
                 <Button
                   type="button"
@@ -168,7 +167,7 @@ function BusinessSettingsCard() {
                   disabled={!isDirty || isSubmitting}
                   onClick={() => query.data && form.reset(toFormValues(query.data))}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             )}

@@ -1,0 +1,492 @@
+# Kiswahili translations for Beauty Business Manager (BBM).
+# Simple, everyday shop words. Regenerate the template with
+#   python manage.py makemessages -l sw --ignore='venv/*' --ignore='*/tests/*' --ignore='*/migrations/*'
+# then fill in any new msgstr and run compilemessages.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: BBM\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-13 10:52+0300\n"
+"Language: sw\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: accounts/serializers.py:26
+msgid "No active account found with the given credentials."
+msgstr "Barua pepe au nenosiri si sahihi."
+
+#: accounts/serializers.py:27
+msgid "A user with this email already exists."
+msgstr "Tayari kuna akaunti yenye barua pepe hii."
+
+#: accounts/serializers.py:28 core/authentication.py:26
+msgid "No active business membership for this token."
+msgstr "Huna tena ruhusa kwenye biashara hii. Ingia upya."
+
+#: accounts/serializers.py:29
+msgid "Reset link is invalid or expired."
+msgstr "Kiungo si sahihi au muda wake umeisha."
+
+#: accounts/serializers.py:140
+msgid "You are not a member of this business."
+msgstr "Wewe si mwanachama wa biashara hii."
+
+#: accounts/serializers.py:147
+msgid "This account belongs to several businesses; choose one."
+msgstr "Akaunti hii ina biashara zaidi ya moja; chagua moja."
+
+#: accounts/serializers.py:179 accounts/serializers.py:181
+msgid "Token is invalid or expired."
+msgstr "Kiungo si sahihi au muda wake umeisha."
+
+#: accounts/views.py:28
+msgid "If an account exists for this email, a reset link has been sent."
+msgstr ""
+"Kama kuna akaunti yenye barua pepe hii, tumetuma kiungo cha kubadilisha "
+"nenosiri."
+
+#: catalog/serializers.py:8
+msgid "This name is already used. Choose another one."
+msgstr "Jina hili tayari linatumika. Chagua jingine."
+
+#: catalog/serializers.py:9
+msgid "This SKU is already used by another product."
+msgstr "SKU hii tayari inatumiwa na bidhaa nyingine."
+
+#: catalog/serializers.py:10
+msgid "This barcode is already used by another product."
+msgstr "Barcode hii tayari inatumiwa na bidhaa nyingine."
+
+#: catalog/serializers.py:137
+msgid "Can't change expiry tracking once the product has batches."
+msgstr ""
+"Huwezi kubadilisha ufuatiliaji wa tarehe ya kuisha baada ya bidhaa kuwa na "
+"bechi."
+
+#: catalog/validators.py:20
+#, python-format
+msgid "Image is too large. The limit is %(mb)s MB."
+msgstr "Picha ni kubwa sana. Mwisho ni MB %(mb)s."
+
+#: catalog/validators.py:29
+msgid "Use a JPEG, PNG or WebP image."
+msgstr "Tumia picha ya JPEG, PNG au WebP."
+
+#: catalog/validators.py:32
+#, python-format
+msgid "Image is too big. Use at most %(size)s×%(size)s pixels."
+msgstr "Picha ni kubwa sana. Isizidi pikseli %(size)s×%(size)s."
+
+#: catalog/validators.py:38
+msgid "This file isn't a valid image. Use a JPEG, PNG or WebP image."
+msgstr "Faili hii si picha sahihi. Tumia picha ya JPEG, PNG au WebP."
+
+#: catalog/views.py:56
+msgid "This category still has products. Move them to another category first."
+msgstr "Aina hii bado ina bidhaa. Zihamishe kwenye aina nyingine kwanza."
+
+#: catalog/views.py:66
+msgid "This brand still has products. Move them to another brand first."
+msgstr "Chapa hii bado ina bidhaa. Zihamishe kwenye chapa nyingine kwanza."
+
+#: catalog/views.py:76
+msgid "This supplier still has products. Move them to another supplier first."
+msgstr ""
+"Msambazaji huyu bado ana bidhaa. Zihamishe kwa msambazaji mwingine kwanza."
+
+#: catalog/views.py:125
+msgid ""
+"This product has stock history and can't be deleted. Archive it instead."
+msgstr ""
+"Bidhaa hii ina historia ya stoki, haiwezi kufutwa. Iweke pembeni badala yake."
+
+#: core/library_messages.py:12
+msgid "This field is required."
+msgstr "Sehemu hii ni lazima."
+
+#: core/library_messages.py:13
+msgid "This field may not be null."
+msgstr "Sehemu hii haiwezi kuwa tupu."
+
+#: core/library_messages.py:14
+msgid "Not a valid string."
+msgstr "Maandishi si sahihi."
+
+#: core/library_messages.py:15
+msgid "This field may not be blank."
+msgstr "Sehemu hii haiwezi kuachwa wazi."
+
+#: core/library_messages.py:16
+#, python-brace-format
+msgid "Ensure this field has no more than {max_length} characters."
+msgstr "Isizidi herufi {max_length}."
+
+#: core/library_messages.py:17
+#, python-brace-format
+msgid "Ensure this field has at least {min_length} characters."
+msgstr "Iwe na herufi {min_length} au zaidi."
+
+#: core/library_messages.py:18
+msgid "A valid number is required."
+msgstr "Weka namba sahihi."
+
+#: core/library_messages.py:19
+#, python-brace-format
+msgid "Ensure this value is less than or equal to {max_value}."
+msgstr "Isizidi {max_value}."
+
+#: core/library_messages.py:20
+#, python-brace-format
+msgid "Ensure this value is greater than or equal to {min_value}."
+msgstr "Iwe {min_value} au zaidi."
+
+#: core/library_messages.py:21
+#, python-brace-format
+msgid "Ensure that there are no more than {max_digits} digits in total."
+msgstr "Isizidi tarakimu {max_digits} kwa jumla."
+
+#: core/library_messages.py:22
+#, python-brace-format
+msgid "Ensure that there are no more than {max_decimal_places} decimal places."
+msgstr "Isizidi tarakimu {max_decimal_places} baada ya nukta."
+
+#: core/library_messages.py:23
+#, python-brace-format
+msgid ""
+"Ensure that there are no more than {max_whole_digits} digits before the "
+"decimal point."
+msgstr "Isizidi tarakimu {max_whole_digits} kabla ya nukta."
+
+#: core/library_messages.py:24
+msgid "A valid integer is required."
+msgstr "Weka namba kamili."
+
+#: core/library_messages.py:25
+#, python-brace-format
+msgid "Date has wrong format. Use one of these formats instead: {format}."
+msgstr "Tarehe imekosewa. Tumia mfumo huu: {format}."
+
+#: core/library_messages.py:26
+msgid "Enter a valid email address."
+msgstr "Weka barua pepe sahihi."
+
+#: core/library_messages.py:27
+msgid "Must be a valid UUID."
+msgstr "Kitambulisho si sahihi."
+
+#: core/library_messages.py:28
+msgid "No file was submitted."
+msgstr "Hakuna faili iliyotumwa."
+
+#: core/library_messages.py:29
+msgid "The submitted data was not a file. Check the encoding type on the form."
+msgstr "Ulichotuma si faili."
+
+#: core/library_messages.py:30
+msgid "The submitted file is empty."
+msgstr "Faili uliyotuma iko tupu."
+
+#: core/library_messages.py:31
+msgid "Must be a valid boolean."
+msgstr "Chagua ndiyo au hapana."
+
+#: core/library_messages.py:32
+#, python-brace-format
+msgid "\"{input}\" is not a valid choice."
+msgstr "\"{input}\" si chaguo sahihi."
+
+#: core/library_messages.py:33
+#, python-brace-format
+msgid "Invalid pk \"{pk_value}\" - object does not exist."
+msgstr "Ulichochagua (\"{pk_value}\") hakipo."
+
+#: core/library_messages.py:34
+msgid "This list may not be empty."
+msgstr "Orodha hii haiwezi kuwa tupu."
+
+#: core/library_messages.py:35
+msgid "Not found."
+msgstr "Haikupatikana."
+
+#: core/library_messages.py:36
+msgid "You do not have permission to perform this action."
+msgstr "Huna ruhusa ya kufanya hivi."
+
+#: core/library_messages.py:37
+msgid "Authentication credentials were not provided."
+msgstr "Tafadhali ingia kwanza."
+
+#: core/library_messages.py:38
+msgid "Incorrect authentication credentials."
+msgstr "Taarifa za kuingia si sahihi."
+
+#: core/library_messages.py:39
+#, python-brace-format
+msgid "Method \"{method}\" not allowed."
+msgstr "Kitendo \"{method}\" hakiruhusiwi."
+
+#: core/library_messages.py:40
+msgid "Malformed request."
+msgstr "Ombi lina makosa."
+
+#: core/library_messages.py:41
+msgid "Request was throttled."
+msgstr "Umejaribu mara nyingi sana."
+
+#: core/library_messages.py:42
+msgid "Token is invalid or expired"
+msgstr "Muda wako umeisha. Tafadhali ingia tena."
+
+#: core/library_messages.py:43
+msgid "This password is too common."
+msgstr "Nenosiri hili ni rahisi sana kukisia."
+
+#: core/library_messages.py:44
+msgid "This password is entirely numeric."
+msgstr "Nenosiri haliwezi kuwa namba tupu."
+
+#: core/library_messages.py:45
+#, python-format
+msgid "The password is too similar to the %(verbose_name)s."
+msgstr "Nenosiri linafanana sana na %(verbose_name)s."
+
+#: core/library_messages.py:52
+#, python-format
+msgid ""
+"This password is too short. It must contain at least %(min_length)d "
+"character."
+msgid_plural ""
+"This password is too short. It must contain at least %(min_length)d "
+"characters."
+msgstr[0] "Nenosiri ni fupi sana. Tumia angalau herufi %(min_length)d."
+msgstr[1] "Nenosiri ni fupi sana. Tumia angalau herufi %(min_length)d."
+
+#: core/library_messages.py:56
+#, python-brace-format
+msgid "Expected available in {wait} second."
+msgid_plural "Expected available in {wait} seconds."
+msgstr[0] "Subiri sekunde {wait}."
+msgstr[1] "Subiri sekunde {wait}."
+
+#: core/views.py:9
+msgid "This record is in use and cannot be deleted."
+msgstr "Hiki bado kinatumika, hakiwezi kufutwa."
+
+#: expenses/serializers.py:27
+msgid "A category with this name already exists."
+msgstr "Tayari kuna aina yenye jina hili."
+
+#: expenses/validators.py:21
+#, python-format
+msgid "The file is too large. The limit is %(mb)s MB."
+msgstr "Faili ni kubwa sana. Mwisho ni MB %(mb)s."
+
+#: expenses/validators.py:32
+msgid "Use a photo (JPEG, PNG or WebP) or a PDF of the receipt."
+msgstr "Tumia picha (JPEG, PNG au WebP) au PDF ya risiti."
+
+#: expenses/views.py:59
+msgid "This category has expenses and can't be deleted."
+msgstr "Aina hii ina matumizi, haiwezi kufutwa."
+
+#: expenses/views.py:133
+msgid "This expense has no receipt."
+msgstr "Matumizi haya hayana risiti."
+
+#: expenses/views.py:194 sales/views.py:241
+msgid "Use a date like 2026-10-10."
+msgstr "Weka tarehe kama 2026-10-10."
+
+#: expenses/views.py:214 sales/views.py:226
+msgid "The end date is before the start date."
+msgstr "Tarehe ya mwisho iko kabla ya tarehe ya kuanza."
+
+#: inventory/serializers.py:35
+msgid "This product already has a batch with this number."
+msgstr "Bidhaa hii tayari ina bechi yenye namba hii."
+
+#: inventory/serializers.py:42
+msgid "This product's batches need an expiry date."
+msgstr "Bechi za bidhaa hii zinahitaji tarehe ya kuisha."
+
+#: inventory/serializers.py:45
+msgid "This product doesn't track expiry. Turn it on for the product first."
+msgstr "Bidhaa hii haifuatilii tarehe ya kuisha. Iwashe kwenye bidhaa kwanza."
+
+#: inventory/serializers.py:125
+msgid "Enter a quantity other than 0."
+msgstr "Weka idadi isiyo 0."
+
+#: inventory/serializers.py:128
+msgid "Damage and expiry remove stock, so the quantity must be negative."
+msgstr ""
+"Kuharibika na kuisha muda kunapunguza stoki, kwa hiyo idadi iwe hasi (chini "
+"ya 0)."
+
+#: inventory/serializers.py:131
+msgid "Choose the batch to remove stock from."
+msgstr "Chagua bechi ya kutoa stoki."
+
+#: inventory/serializers.py:159
+#, python-format
+msgid "Only %(count)s in stock in this batch."
+msgstr "Zimebaki %(count)s tu kwenye bechi hii."
+
+#: inventory/services.py:160
+msgid "This batch belongs to a different product."
+msgstr "Bechi hii ni ya bidhaa nyingine."
+
+#: inventory/services.py:165
+msgid "Choose a batch or enter a new batch number."
+msgstr "Chagua bechi au weka namba ya bechi mpya."
+
+#: inventory/services.py:173
+#, python-format
+msgid "Batch %(batch)s already exists with a different expiry date."
+msgstr "Bechi %(batch)s tayari ipo na tarehe tofauti ya kuisha."
+
+#: inventory/services.py:180
+msgid "New batches of this product need an expiry date."
+msgstr "Bechi mpya za bidhaa hii zinahitaji tarehe ya kuisha."
+
+#: inventory/views.py:185
+msgid "Use a whole number of days from 1 to 365."
+msgstr "Weka idadi kamili ya siku kati ya 1 na 365."
+
+#: purchases/services.py:38
+msgid "Add at least one product to the purchase."
+msgstr "Ongeza angalau bidhaa moja kwenye manunuzi."
+
+#: purchases/services.py:49
+#, python-format
+msgid "%(name)s is archived. Reactivate it before buying more."
+msgstr "%(name)s imewekwa pembeni. Irudishe kwanza kabla ya kununua tena."
+
+#: purchases/services.py:51 sales/services.py:184
+#, python-format
+msgid "%(name)s: quantity must be at least 1."
+msgstr "%(name)s: idadi iwe angalau 1."
+
+#: purchases/services.py:53
+#, python-format
+msgid "%(name)s: the unit cost can't be negative."
+msgstr "%(name)s: bei ya kununua haiwezi kuwa chini ya 0."
+
+#: purchases/services.py:58
+#, python-format
+msgid "%(name)s: enter the batch number printed on the stock."
+msgstr "%(name)s: weka namba ya bechi iliyo kwenye mzigo."
+
+#: purchases/services.py:65
+#, python-format
+msgid "%(name)s: batch %(batch)s is new and needs an expiry date."
+msgstr "%(name)s: bechi %(batch)s ni mpya, inahitaji tarehe ya kuisha."
+
+#: purchases/services.py:74
+#, python-format
+msgid "%(name)s: batch %(batch)s already exists with a different expiry date."
+msgstr "%(name)s: bechi %(batch)s tayari ipo na tarehe tofauti ya kuisha."
+
+#: purchases/services.py:86
+#, python-format
+msgid "%(name)s is listed twice for the same batch. Use one line."
+msgstr "%(name)s imeandikwa mara mbili kwa bechi moja. Tumia mstari mmoja."
+
+#: purchases/services.py:115
+msgid "Only a draft purchase can be edited."
+msgstr "Manunuzi ya rasimu tu ndiyo yanaweza kubadilishwa."
+
+#: purchases/services.py:136
+msgid "This purchase is already received."
+msgstr "Manunuzi haya yameshapokelewa."
+
+#: purchases/services.py:138
+msgid "This purchase is already cancelled."
+msgstr "Manunuzi haya yameshaghairiwa."
+
+#: purchases/services.py:142
+msgid "Add at least one product before receiving."
+msgstr "Ongeza angalau bidhaa moja kabla ya kupokea."
+
+#: purchases/services.py:197
+msgid "Say why the purchase is being cancelled."
+msgstr "Eleza kwa nini unaghairi manunuzi haya."
+
+#: purchases/services.py:200
+msgid "Only a draft purchase can be cancelled."
+msgstr "Manunuzi ya rasimu tu ndiyo yanaweza kughairiwa."
+
+#: sales/serializers.py:45
+msgid "A customer with this phone number already exists."
+msgstr "Tayari kuna mteja mwenye namba hii ya simu."
+
+#: sales/serializers.py:57
+msgid "A customer with this phone number already exists. Choose them instead."
+msgstr "Tayari kuna mteja mwenye namba hii ya simu. Mchague yeye."
+
+#: sales/serializers.py:91
+msgid "Choose an existing customer or enter a new one, not both."
+msgstr "Chagua mteja aliyepo au weka mpya, si vyote viwili."
+
+#: sales/services.py:170
+msgid "Add at least one product to the sale."
+msgstr "Ongeza angalau bidhaa moja kwenye mauzo."
+
+#: sales/services.py:178
+#, python-format
+msgid "%(name)s is listed twice. Use one line per product."
+msgstr "%(name)s imeandikwa mara mbili. Tumia mstari mmoja kwa kila bidhaa."
+
+#: sales/services.py:182
+#, python-format
+msgid "%(name)s is archived and can't be sold."
+msgstr "%(name)s imewekwa pembeni, haiwezi kuuzwa."
+
+#: sales/services.py:192
+#, python-format
+msgid "%(name)s: the discount must be between 0 and %(max)s."
+msgstr "%(name)s: punguzo liwe kati ya 0 na %(max)s."
+
+#: sales/services.py:222
+msgid "Enter the cash received (0 or more)."
+msgstr "Weka pesa uliyopokea (0 au zaidi)."
+
+#: sales/services.py:231
+msgid ""
+"The cash received is less than the total. Choose the customer who owes the "
+"rest."
+msgstr ""
+"Pesa uliyopokea ni pungufu ya jumla. Chagua mteja anayedaiwa kiasi "
+"kilichobaki."
+
+#: sales/services.py:250
+#, python-format
+msgid "%(name)s: only %(count)s available to sell."
+msgstr "%(name)s: zimebaki %(count)s tu za kuuza."
+
+#: sales/services.py:321
+msgid "This sale is void."
+msgstr "Mauzo haya yamebatilishwa."
+
+#: sales/services.py:323
+msgid "Nothing is owed on this sale."
+msgstr "Hakuna deni kwenye mauzo haya."
+
+#: sales/services.py:325
+msgid "Enter the cash received."
+msgstr "Weka pesa uliyopokea."
+
+#: sales/services.py:344
+msgid "Say why the sale is being voided."
+msgstr "Eleza kwa nini unabatilisha mauzo haya."
+
+#: sales/services.py:347
+msgid "This sale is already void."
+msgstr "Mauzo haya yameshabatilishwa."
+
+#: sales/views.py:275
+msgid "This customer has sales and can't be deleted."
+msgstr "Mteja huyu ana mauzo, hawezi kufutwa."

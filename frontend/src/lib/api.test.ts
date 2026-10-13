@@ -97,4 +97,19 @@ describe('api client', () => {
       email: 'A user with this email already exists.',
     })
   })
+
+  it('asks the server to answer in the chosen language', async () => {
+    const { api } = await loadApi()
+    const i18n = (await import('@/i18n')).default
+    const fetchMock = mockFetch({ 'GET /a/': { status: 200, body: {} } })
+    const language = () => (fetchMock.calls.at(-1)!.init.headers as Record<string, string>)['Accept-Language']
+
+    await api('/a/', { auth: false })
+    expect(language()).toBe('sw') // the default
+
+    await i18n.changeLanguage('en')
+    await api('/a/', { auth: false })
+    expect(language()).toBe('en')
+  })
 })
+

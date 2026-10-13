@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
@@ -24,7 +25,7 @@ from .serializers import (
 )
 from .services import get_permission_codenames
 
-PASSWORD_RESET_SENT = "If an account exists for this email, a reset link has been sent."
+PASSWORD_RESET_SENT = _("If an account exists for this email, a reset link has been sent.")
 
 VALIDATION_ERROR = OpenApiResponse(description="Validation error.")
 THROTTLED = OpenApiResponse(description="Too many requests from this IP.")

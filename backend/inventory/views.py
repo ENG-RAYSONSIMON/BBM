@@ -1,5 +1,6 @@
 import django_filters
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics, mixins, status, viewsets
@@ -181,7 +182,7 @@ class ExpiringView(generics.ListAPIView):
             except ValueError:
                 days = -1
             if not 1 <= days <= 365:
-                raise ValidationError({"within": ["Use a whole number of days from 1 to 365."]})
+                raise ValidationError({"within": [_("Use a whole number of days from 1 to 365.")]})
         return expiring_batches(within_days=days).select_related("product")
 
 

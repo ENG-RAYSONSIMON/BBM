@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Navigate, Outlet, useLocation } from 'react-router'
 
 import { FullPageError, FullPageLoading } from '@/components/full-page-status'
@@ -7,10 +8,11 @@ import { useAuth } from '@/lib/auth-context'
 export function RequireAuth() {
   const { status, error, retry } = useAuth()
   const location = useLocation()
+  const { t } = useTranslation()
 
   if (status === 'loading') return <FullPageLoading />
   if (status === 'error') {
-    return <FullPageError message={error?.message ?? 'Could not load your account.'} onRetry={retry} />
+    return <FullPageError message={error?.message ?? t('common.couldNotLoadAccount')} onRetry={retry} />
   }
   if (status === 'anonymous') return <Navigate to="/login" replace state={{ from: location }} />
   return <Outlet />

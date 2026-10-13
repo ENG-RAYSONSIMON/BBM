@@ -1,9 +1,11 @@
 import { MenuIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
 
 import { Brand } from './brand'
 import { SidebarContent } from './sidebar-content'
+import { LanguageToggle } from '@/components/language-toggle'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
@@ -12,6 +14,7 @@ import { useAuth } from '@/lib/auth-context'
 /** Desktop (md+): fixed sidebar. Mobile: top bar whose menu opens the sidebar as a drawer. */
 export function AppShell() {
   const { me } = useAuth()
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   // The page the drawer was opened on. Any page change (link, back button,
   // redirect) closes it without an extra effect.
@@ -37,7 +40,7 @@ export function AppShell() {
         <Button
           variant="ghost"
           size="icon-lg"
-          aria-label="Open menu"
+          aria-label={t('common.openMenu')}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen(true)}
         >
@@ -47,13 +50,14 @@ export function AppShell() {
           <Brand compact />
           <span className="truncate font-medium">{me?.business.name}</span>
         </div>
+        <LanguageToggle />
         <ThemeToggle />
       </header>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="left" className="w-72 gap-0 p-0 md:hidden">
-          <SheetTitle className="sr-only">Menu</SheetTitle>
-          <SheetDescription className="sr-only">Pages and account</SheetDescription>
+          <SheetTitle className="sr-only">{t('common.menu')}</SheetTitle>
+          <SheetDescription className="sr-only">{t('common.pagesAndAccount')}</SheetDescription>
           <SidebarContent onNavigate={() => setMenuOpen(false)} />
         </SheetContent>
       </Sheet>

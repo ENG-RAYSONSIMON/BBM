@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { Brand } from './brand'
+import { LanguageToggle } from '@/components/language-toggle'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -18,7 +19,8 @@ export function AuthLayout({
 }) {
   return (
     <main className="bg-muted/40 relative flex min-h-svh flex-col items-center justify-center gap-6 px-4 py-16">
-      <div className="absolute top-3 right-3">
+      <div className="absolute top-3 right-3 flex">
+        <LanguageToggle />
         <ThemeToggle />
       </div>
       <Brand />

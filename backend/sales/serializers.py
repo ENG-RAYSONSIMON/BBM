@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from catalog.models import Product
@@ -41,7 +42,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     def validate_phone(self, value):
         value = value.strip()
         if _phone_taken(value, exclude=self.instance):
-            raise serializers.ValidationError("A customer with this phone number already exists.")
+            raise serializers.ValidationError(_("A customer with this phone number already exists."))
         return value
 
 
@@ -53,7 +54,7 @@ class NewCustomerSerializer(serializers.Serializer):
         value = value.strip()
         if _phone_taken(value):
             raise serializers.ValidationError(
-                "A customer with this phone number already exists. Choose them instead."
+                _("A customer with this phone number already exists. Choose them instead.")
             )
         return value
 
@@ -87,7 +88,7 @@ class SaleCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs.get("customer") and attrs.get("new_customer"):
             raise serializers.ValidationError(
-                {"new_customer": ["Choose an existing customer or enter a new one, not both."]}
+                {"new_customer": [_("Choose an existing customer or enter a new one, not both.")]}
             )
         return attrs
 
@@ -229,3 +230,11 @@ class SalesSummarySerializer(serializers.Serializer):
     gross_profit = serializers.DecimalField(**MONEY)
     cash_collected = serializers.DecimalField(**MONEY, help_text="Payments − refunds in the range.")
     outstanding_credit = serializers.DecimalField(**MONEY, help_text="Still owed on all sales, all time.")
+    expenses = serializers.DecimalField(
+        **MONEY, allow_null=True,
+        help_text="Expenses dated in the range. Null without the expenses.view permission.",
+    )
+    net_profit = serializers.DecimalField(
+        **MONEY, allow_null=True,
+        help_text="Gross profit − expenses. Null without the expenses.view permission.",
+    )

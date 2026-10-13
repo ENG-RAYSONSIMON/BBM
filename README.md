@@ -36,7 +36,7 @@ profit reports.
   for multi-business accounts), forgot/reset password, a dashboard with
   empty states, and business settings (editable with `settings.manage`).
 - OpenAPI schema with Swagger UI and ReDoc (development only; see §6).
-- 53 tests, all passing. The FR-4/FR-5 and OpenAPI changes are not committed yet.
+- 61 backend tests and 16 frontend tests, all passing.
 
 **Done: Phase 2, Catalog & Inventory (FR-6 to FR-10)**, backend and frontend.
 See `docs/PHASE_2_SUMMARY.md`.
@@ -49,8 +49,7 @@ See `docs/PHASE_2_SUMMARY.md`.
 - Pagination, search and filters on every list; NFR-7 cross-tenant tests on
   every Phase 2 endpoint.
 
-**In progress: Phase 3, The Money Path.** Step 1, cash sales with credit
-(FR-11 to FR-13, FR-16 gross profit, FR-17), is done. See
+**Done: Phase 3, The Money Path (FR-11 to FR-17)**, backend and frontend. See
 `docs/PHASE_3_SUMMARY.md`.
 - A sale is one atomic transaction: stock is checked and taken from the
   earliest-expiring batches (expired stock is never sold), price and cost are
@@ -60,16 +59,25 @@ See `docs/PHASE_2_SUMMARY.md`.
 - Voiding a sale returns its stock to the original batches and refunds the
   cash collected; nothing is deleted. Payments, like stock movements, are
   append-only.
-- Sale screen (`/pos`), sales list and receipts, customers with what they owe,
-  and live dashboard tiles (today's sales, profit, cash collected, credit
-  outstanding).
+- Sale screen (`/pos`), sales list and receipts, customers with what they owe.
+- Purchases (FR-14): a draft is edited freely; receiving it writes `PURCHASE`
+  movements into new or existing batches in one transaction and sets each
+  product's cost price to what was paid.
+- Expenses (FR-15) by category, with an optional photo or PDF receipt served
+  only through the API.
+- Net profit (FR-16) = gross profit − expenses for the period. The dashboard
+  (FR-17) shows sales, gross and net profit, expenses, cash and credit for
+  today, the last 7 days or this month.
+
+**Languages: Kiswahili (default) and English.** A language button next to the
+theme button switches the whole app, including server error messages. See §7.
 
 **Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8, `docs/PHASE_2_SUMMARY.md` and
 `docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. no staff-management API yet;
 media served by Django in dev only; cash is the only payment method).
 
-**Next: Phase 3 step 2, purchases (FR-14)** that write `PURCHASE` movements,
-then expenses (FR-15) and net profit.
+**Next: Phase 4** (reports with CSV export FR-18, notifications FR-19, audit
+log FR-20), unless Phase 3's known gaps come first.
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -80,9 +88,13 @@ Rules that still apply:
   `save()` (see `catalog/models.py`).
 - Stock changes only through `inventory.services.record_movement()`.
 - Every authenticated view declares `required_permissions`. New codenames go in
-  `accounts/rbac.py` plus a data migration (see `accounts/0004_phase2_permissions`).
+  `accounts/rbac.py` plus a data migration (copy the latest,
+  `accounts/0006_phase3_purchases_expenses_permissions`).
 - Every endpoint gets `@extend_schema`; `accounts.tests.test_schema` fails on
   any warning. Every detail endpoint gets a cross-tenant 404 test.
+- No hard-coded user-visible text: `_()` on the backend (then `makemessages` /
+  `compilemessages`, §7) and `t()` keys in both `en.ts` and `sw.ts` on the
+  frontend.
 - Plan first, get approval, then implement (see `CLAUDE.md`).
 
 ---
@@ -154,6 +166,9 @@ REDIS_URL=redis://redis:6379/0               # throttle counters; LocMem if unse
 # REGISTER_THROTTLE_RATE=5/hour             # per IP
 # TOKEN_REFRESH_THROTTLE_RATE=30/min        # per IP
 # DEFAULT_FROM_EMAIL=no-reply@bbm.local
+# PRODUCT_IMAGE_MAX_BYTES=2097152           # product image upload limit
+# EXPENSE_RECEIPT_MAX_BYTES=5242880         # expense receipt upload limit
+# PRIVATE_MEDIA_ROOT=/app/private_media     # receipts; never served at /media/
 ```
 
 Notes:
@@ -205,9 +220,11 @@ browser calls that URL, so it uses the host port, not `backend:8000`.
 
 5. Open **http://localhost:5173**, click **Register**, and create a business.
    You land on the dashboard as its Owner. From there, set up
-   **Catalog** (categories, brands, suppliers), add **Products**, adjust stock
-   from a product's page, and check **Inventory** for low-stock and expiry
-   alerts.
+   **Catalog** (categories, brands, suppliers), add **Products**, and bring
+   stock in with **Purchases** (save a draft, then receive it) or an
+   adjustment on a product's page. Sell from the **Sale screen** (`/pos`),
+   record **Expenses**, and check **Inventory** for low-stock and expiry
+   alerts and the dashboard for profit.
 
 | URL | What |
 |---|---|
@@ -228,7 +245,8 @@ docker compose logs -f backend frontend
 `./backend` and `./frontend` are bind-mounted, so code changes hot-reload:
 runserver restarts on Python changes and Vite updates the browser on frontend
 changes. Rebuild the backend image (`docker compose up -d --build backend`)
-only after changing `backend/requirements.txt`.
+only after changing `backend/requirements.txt` or `backend/Dockerfile` (the
+image includes `gettext` for translations, §7).
 
 After `frontend/package.json` or `package-lock.json` changes, run
 `docker compose restart frontend`; `npm ci` runs on every start and reinstalls
@@ -299,7 +317,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (154 tests)
+docker compose exec backend python manage.py test            # whole suite (201 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -307,13 +325,15 @@ docker compose exec backend python manage.py test accounts.tests.test_password_r
 docker compose exec backend python manage.py test accounts.tests.test_permissions
 docker compose exec backend python manage.py test accounts.tests.test_schema
 docker compose exec backend python manage.py test sales      # sales, credit, voids, isolation
+docker compose exec backend python manage.py test purchases  # drafts, receiving, rollback, isolation
+docker compose exec backend python manage.py test expenses   # expenses, receipts, net profit, isolation
 docker compose exec backend python manage.py check
 ```
 
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (47 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, dashboard
+docker compose exec frontend npm test         # Vitest (79 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
@@ -387,11 +407,17 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | POST | `/api/v1/sales/{id}/void/` | Bearer | `sales.void` (Owner) |
 | GET | `/api/v1/sales/summary/` | Bearer | `sales.view` |
 | GET/POST/PATCH/DELETE | `/api/v1/customers/` … | Bearer | view / `sales.create` / `sales.void` to delete |
+| GET/POST, GET/PUT | `/api/v1/purchases/`, `/api/v1/purchases/{id}/` | Bearer | `purchases.view` / `purchases.manage` |
+| POST | `/api/v1/purchases/{id}/receive/`, `…/cancel/` | Bearer | `purchases.manage` |
+| GET/POST/PATCH/DELETE | `/api/v1/expenses/` … | Bearer | `expenses.view` / `expenses.manage` / `expenses.delete` (Owner) |
+| GET/PUT/DELETE | `/api/v1/expenses/{id}/receipt/` | Bearer | view / `expenses.manage` |
+| GET | `/api/v1/expenses/summary/` | Bearer | `expenses.view` |
+| GET/POST/PATCH/DELETE | `/api/v1/expense-categories/` … | Bearer | `expenses.view` / `expenses.manage` / `expenses.delete` |
 
 A missing permission returns **403**. Request and response details:
 `docs/PHASE_1_SUMMARY.md` §3 (auth), §7 (password reset), §8 (permissions);
 catalog and inventory endpoints in `docs/PHASE_2_SUMMARY.md` §5; sales in
-`docs/PHASE_3_SUMMARY.md` §4.
+`docs/PHASE_3_SUMMARY.md` §4, purchases and expenses in its step 2 section.
 
 ```bash
 # A cash sale: 2 units, 30,000 handed over (change is computed and stored)
@@ -423,7 +449,8 @@ No login is needed to open them. To call protected endpoints from Swagger UI:
    **Authorize**. The token is kept across page reloads.
 3. It expires after 20 minutes; get a new one from `/auth/refresh/`.
 
-Operations are grouped by tag (`auth`, `password reset`, `settings`). Each
+Operations are grouped by tag (`auth`, `password reset`, `settings`,
+`catalog`, `inventory`, `sales`, `purchases`, `expenses`). Each
 protected operation's description shows the permission it needs
 (e.g. **Requires permission:** `settings.manage`), also exposed as the
 `x-required-permissions` field. This comes from the view's
@@ -441,43 +468,105 @@ docker compose exec backend python manage.py spectacular --validate --fail-on-wa
 
 ---
 
+## 7. Languages (Kiswahili / English)
+
+- **Who sees what.** Kiswahili is the default on a new device. The language
+  button next to the theme button switches between Kiswahili and English.
+  The choice is saved on that device (`localStorage["bbm.lang"]`), like the
+  theme.
+- **Wording.** The Swahili is kept simple and casual: everyday shop words,
+  short sentences.
+- **Frontend.** Text lives in `frontend/src/i18n/en.ts` and `sw.ts` (i18next).
+  `sw.ts` must have every key in `en.ts`, or `npm run build` fails. Components
+  use `const { t } = useTranslation()` and `t('area.key')`.
+- **Server messages.**
+  - The frontend sends `Accept-Language: sw` or `en`, and Django answers in
+    that language through `LocaleMiddleware`.
+  - Our messages use `gettext` (`_()`). Their Kiswahili is in
+    `backend/locale/sw/LC_MESSAGES/django.po`, compiled to `django.mo`; both
+    files are committed.
+  - Django REST framework ships no Kiswahili, so the library messages users
+    see are listed in `backend/core/library_messages.py` and translated in the
+    same file.
+- **Adding or changing a server message:**
+
+  ```bash
+  docker compose exec backend python manage.py makemessages -l sw \
+    --ignore='venv/*' --ignore='*/tests/*' --ignore='*/migrations/*' --no-obsolete
+  # fill in the new msgstr lines in backend/locale/sw/LC_MESSAGES/django.po, then
+  docker compose exec backend python manage.py compilemessages -l sw --ignore='venv/*'
+  docker compose restart backend
+  ```
+
+  `sales.tests.test_i18n` fails if a message is untranslated or the `.mo` is
+  out of date.
+
+---
+
 ## Repo layout
 
 ```
 BBM/
 ├── docker-compose.yml        # db, redis, backend, frontend
+├── CLAUDE.md                 # architecture rules + working conventions (for Claude Code)
+├── .claude/                  # Claude Code setup: rules/, skills/, agents/, settings.json
 ├── .env                      # compose vars (gitignored; see .env.example)
 ├── docs/
 │   ├── BBM_SRS_Summary_Draft.pdf
 │   ├── PHASE_1_SUMMARY.md
-│   └── PHASE_2_SUMMARY.md
-└── backend/
-    ├── Dockerfile
-    ├── requirements.txt
-    ├── .env                  # Django vars (gitignored; see .env.example)
-    ├── config/               # settings, root urls (API docs routes when DEBUG)
-    ├── core/                 # tenancy: TenantModel, TenantManager, tenant context,
-    │                         #   TenantJWTAuthentication, HasTenantPermission,
-    │                         #   OpenAPI schema hooks (schema.py), middleware, admin base
-    ├── accounts/             # User, Business, Role, UserRole, BusinessSettings,
-    │                         #   Permission, RolePermission, PasswordResetToken;
-    │                         #   rbac.py (permission catalog + role defaults);
-    │                         #   register/login/refresh/logout/me, password reset,
-    │                         #   settings
-    ├── catalog/              # Category, Brand, Supplier, Product, ProductBatch;
-    │                         #   CRUD + product image upload (validators.py)
-    ├── inventory/            # StockMovement ledger, services.py (record_movement,
-    │                         #   derived stock), batches, adjustments, alerts
-    ├── sales/                # Customer, Sale, SaleItem, SaleItemAllocation, Payment;
-    │                         #   services.py (create_sale, record_payment, void_sale,
-    │                         #   derived balances, summary)
-    └── media/                # uploaded images, dev only (gitignored)
-frontend/
-├── src/lib/                  # api.ts (fetch + token refresh), auth.tsx / auth-context.ts,
-│                             #   schemas.ts (Zod), forms.ts, types.ts
-├── src/pages/                # auth pages, dashboard, settings, products (list, detail,
-│                             #   form), inventory alerts, catalog setup, sale screen (pos),
-│                             #   sales + receipt, customers
-├── src/components/           # layout (app shell, auth layout), shadcn/ui in ui/
-└── src/routes/guards.tsx     # RequireAuth / RedirectIfAuthed
+│   ├── PHASE_2_SUMMARY.md
+│   └── PHASE_3_SUMMARY.md
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── .env                  # Django vars (gitignored; see .env.example)
+│   ├── config/               # settings, root urls (API docs routes when DEBUG)
+│   ├── locale/sw/            # Kiswahili server messages (django.po / django.mo)
+│   ├── core/                 # tenancy: TenantModel, TenantManager, tenant context,
+│   │                         #   TenantJWTAuthentication, HasTenantPermission,
+│   │                         #   OpenAPI schema hooks (schema.py), middleware, admin base
+│   ├── accounts/             # User, Business, Role, UserRole, BusinessSettings,
+│   │                         #   Permission, RolePermission, PasswordResetToken;
+│   │                         #   rbac.py (permission catalog + role defaults);
+│   │                         #   register/login/refresh/logout/me, password reset,
+│   │                         #   settings
+│   ├── catalog/              # Category, Brand, Supplier, Product, ProductBatch;
+│   │                         #   CRUD + product image upload (validators.py)
+│   ├── inventory/            # StockMovement ledger, services.py (record_movement,
+│   │                         #   derived stock), batches, adjustments, alerts
+│   ├── sales/                # Customer, Sale, SaleItem, SaleItemAllocation, Payment;
+│   │                         #   services.py (create_sale, record_payment, void_sale,
+│   │                         #   derived balances, summary incl. net profit)
+│   ├── purchases/            # Purchase, PurchaseItem; services.py (save_draft,
+│   │                         #   receive_purchase, cancel_purchase)
+│   ├── expenses/             # ExpenseCategory, Expense; receipt validation and
+│   │                         #   download, expense totals
+│   ├── media/                # product images, dev only (gitignored)
+│   └── private_media/        # expense receipts, served only by the API (gitignored)
+└── frontend/
+    ├── src/i18n/             # i18next setup, en.ts / sw.ts dictionaries
+    ├── src/lib/              # api.ts (fetch + token refresh), auth.tsx / auth-context.ts,
+    │                         #   schemas.ts (Zod), forms.ts, types.ts, format.ts,
+    │                         #   money.ts (cents maths, cart, change), dates.ts
+    │                         #   (period ranges), purchases.ts (line maths)
+    ├── src/pages/            # auth pages, dashboard, settings, products (list, detail,
+    │                         #   form), inventory alerts, catalog setup, sale screen (pos),
+    │                         #   sales + receipt, customers, purchases (list, form,
+    │                         #   detail), expenses
+    ├── src/components/       # layout (app shell, auth layout), shadcn/ui in ui/
+    ├── src/routes/guards.tsx # RequireAuth / RedirectIfAuthed
+    └── src/test/             # Vitest setup, mockFetch, render helpers, fixtures
 ```
+
+### Working with Claude Code
+
+`CLAUDE.md` holds the architecture rules and working conventions. `.claude/`
+adds:
+
+| Path | What |
+|---|---|
+| `rules/backend.md`, `rules/frontend.md` | Detailed coding rules, loaded for files under `backend/` / `frontend/` |
+| `skills/new-resource/` | Checklist for a new tenant-scoped model, endpoint and page |
+| `skills/verify/` | Runs every backend and frontend check and reports the results (`/verify`) |
+| `agents/tenancy-reviewer.md` | Read-only review of backend changes against the tenancy, ledger, snapshot and atomicity rules |
+| `settings.json` | Pre-approved read-only/test commands; denies reading the `.env` files |

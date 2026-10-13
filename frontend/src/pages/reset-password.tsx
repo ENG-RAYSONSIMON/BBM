@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -25,6 +26,7 @@ export function ResetPasswordPage() {
     }
   }, [])
   const { status, logout } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const form = useForm<ResetPasswordValues>({
@@ -42,7 +44,7 @@ export function ResetPasswordPage() {
       })
       // The reset ended every session on the server; end this one too.
       if (status === 'authenticated') await logout()
-      toast.success('Password changed. Log in with your new password.')
+      toast.success(t('auth.passwordChanged'))
       navigate('/login', { replace: true })
     } catch (error) {
       const tokenError = error instanceof ApiError ? error.fieldErrors().token : undefined
@@ -53,41 +55,39 @@ export function ResetPasswordPage() {
 
   const requestAgain = (
     <Link to="/forgot-password" className="text-foreground font-medium underline-offset-4 hover:underline">
-      Request a new link
+      {t('auth.requestNewLink')}
     </Link>
   )
 
   if (!token) {
     return (
-      <AuthLayout title="Reset link is missing" footer={requestAgain}>
-        <p className="text-sm">
-          Open the link from your email again, or request a new one. Links can only be used once.
-        </p>
+      <AuthLayout title={t('auth.linkMissing')} footer={requestAgain}>
+        <p className="text-sm">{t('auth.linkMissingText')}</p>
       </AuthLayout>
     )
   }
 
   return (
-    <AuthLayout title="Choose a new password" footer={requestAgain}>
+    <AuthLayout title={t('auth.newPasswordTitle')} footer={requestAgain}>
       <form className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         <FormError message={errors.root?.server?.message} />
         <FormField
-          label="New password"
+          label={t('auth.newPassword')}
           type="password"
           autoComplete="new-password"
-          hint="At least 8 characters. Avoid common or all-number passwords."
+          hint={t('auth.passwordHint')}
           error={errors.new_password?.message}
           {...form.register('new_password')}
         />
         <FormField
-          label="Confirm new password"
+          label={t('auth.confirmNewPassword')}
           type="password"
           autoComplete="new-password"
           error={errors.confirm_password?.message}
           {...form.register('confirm_password')}
         />
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : 'Set new password'}
+          {isSubmitting ? t('common.saving') : t('auth.setNewPassword')}
         </Button>
       </form>
     </AuthLayout>

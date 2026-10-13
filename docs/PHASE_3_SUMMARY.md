@@ -5,7 +5,8 @@ blocked), **FR-16** (gross profit from snapshotted cost) and **FR-17** (live
 dashboard figures) from `docs/BBM_SRS_Summary_Draft.pdf` (v0.2), for cash
 sales. Purchases (FR-14), expenses (FR-15) and net profit are the next steps.
 
-Status as of 2026-10-10: implemented, not yet committed.
+Status as of 2026-10-10: implemented and committed (`6beee83`). Step 2 (purchases,
+expenses, net profit) is described at the end of this file.
 - Backend: 154 tests (120 from Phases 1–2, 34 new). The schema validates with `--fail-on-warn`.
 - Frontend: 47 Vitest tests (16 new).
 
@@ -150,3 +151,156 @@ Errors not tied to a field (e.g. "This sale is already void.") come back as `non
 - [ ] The main JS chunk is still about 627 kB. Route splitting moved the pages out, but shared libraries dominate; vendor chunking is a separate task.
 - [ ] `QuerySet.update()` / `bulk_create()` on `Payment` bypass the append-only guard, the same as `StockMovement`.
 - [ ] Two simultaneous requests creating a customer with the same phone: the second gets a 500 (unique constraint) instead of a 400. Data stays consistent.
+
+---
+
+# Step 2: purchases, expenses and net profit
+
+Covers **FR-14** (a received purchase adds stock and writes `PURCHASE`
+movements in one transaction), **FR-15** (categorised expenses with an optional
+validated receipt), the second half of **FR-16** (net profit = gross profit −
+period expenses) and the date range of **FR-17**.
+
+Status as of 2026-10-13: implemented, not yet committed.
+- Backend: 195 tests (154 from step 1 and earlier, 41 new). The schema validates with `--fail-on-warn`.
+- Frontend: 70 Vitest tests (23 new).
+
+Decisions taken with the product owner:
+- **Draft → Receive.** A draft can be edited and holds no stock. Receiving is final; only a draft can be cancelled. Stock mistakes after receiving are fixed with adjustments.
+- **No supplier payments or credit yet.** A purchase records only what it cost.
+- **Latest cost wins.** Receiving sets each product's `cost_price` to the unit cost just paid. Future sales snapshot it; past sales keep their own snapshots.
+- **Receipts:** JPEG, PNG, WebP or PDF, up to 5 MB, one per expense.
+
+## S2.1 App: `purchases`
+
+| Model | Holds |
+|---|---|
+| `Purchase` | `number` (`P-000001`, sequential per business), `status` (`DRAFT`/`RECEIVED`/`CANCELLED`), optional `supplier`, `reference` (supplier invoice no.), `purchase_date`, `note`, `total`, who created/received/cancelled it and when, `cancel_reason`. Indexes `(business, created_at)`, `(business, purchase_date)`. |
+| `PurchaseItem` | `product`, `quantity` > 0, `unit_cost` (as paid), `line_total` (DB check: `quantity × unit_cost`), `batch_number`, `expiry_date`, and `batch` (set on receive). Unique `(purchase, product, batch_number)`. |
+
+**Services (`purchases/services.py`)**, each `@transaction.atomic`:
+- **`save_draft()`** creates a draft (its number under the `BusinessSettings` row lock) or replaces a draft's details and lines. Lines are checked:
+  - the product is active
+  - quantity ≥ 1, cost ≥ 0
+  - products that track expiry need a batch number, plus an expiry date when the batch is new
+  - an existing batch with a different expiry is refused
+  - products without expiry use the DEFAULT batch.
+- **`receive_purchase()`**:
+  1. Locks the purchase and re-checks every line against the products as they are now. A product may have been archived, or its expiry tracking changed, since the draft was saved.
+  2. Per line: `resolve_batch()` → `record_movement(PURCHASE, +qty)` → store the batch on the item → set `product.cost_price`.
+  3. Marks the purchase `RECEIVED`.
+
+  Any failure rolls everything back.
+- **`cancel_purchase()`**: drafts only, with a reason.
+
+## S2.2 App: `expenses`
+
+| Model | Holds |
+|---|---|
+| `ExpenseCategory` | `name` (unique per business, case-insensitive), `description`. Every business gets Rent, Salaries & wages, Utilities, Transport, Marketing, Supplies and Other: new ones at registration, existing ones from migration `expenses/0002`. |
+| `Expense` | `category`, `amount` > 0, `expense_date` (the date net profit uses), `description`, `paid_to`, `method` (`CASH`), `receipt`, `recorded_by`. Indexes `(business, expense_date)`, `(business, created_at)`. |
+
+**Receipts:**
+- **Validation.** PDFs are recognised by their `%PDF-` signature. Images are checked with the Pillow validator used for product images: `validate_product_image` gained optional `max_bytes` / `max_dimension` arguments, and receipts allow up to 10,000 px for phone photos. The size limit is `EXPENSE_RECEIPT_MAX_BYTES`, default 5 MB.
+- **Storage.** Files go to `PrivateStorage` under `PRIVATE_MEDIA_ROOT` (default `backend/private_media/`), never under `MEDIA_ROOT`. They have no public URL.
+- **Download.** Only through `GET expenses/{id}/receipt/`, which requires `expenses.view` in the owning business. It is sent as an attachment with `Content-Security-Policy: sandbox` and `nosniff`.
+- **Writes.** Uploads and removals lock the expense row. A replaced or removed file is deleted only after the change commits.
+- **Admin.** The Django admin shows "has receipt" but never the file.
+
+## S2.3 Net profit (FR-16) and dashboard (FR-17)
+- `GET sales/summary/` adds two fields:
+  - `expenses`: the expenses dated in the range
+  - `net_profit`: `gross_profit − expenses`.
+
+  Both are `null` for callers without `expenses.view`.
+- The dashboard has a **Today / Last 7 days / This month** selector and live **Expenses** and **Net profit** tiles (only with `expenses.view`). The old placeholder is gone.
+
+## S2.4 Permissions
+
+Defined in `accounts/rbac.py` and data migration `accounts/0006_phase3_purchases_expenses_permissions.py`.
+
+| Codename | Owner | Admin |
+|---|---|---|
+| `purchases.view` | ✓ | ✓ |
+| `purchases.manage` (create, edit, receive, cancel) | ✓ | ✓ |
+| `expenses.view` (incl. net profit) | ✓ | ✓ |
+| `expenses.manage` (record, edit, receipts, categories) | ✓ | ✓ |
+| `expenses.delete` (expenses and categories) | ✓ | |
+
+## S2.5 Endpoints (under `/api/v1/`)
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET/POST purchases/` | view / manage | Filters `status`, `supplier`, `date_from`/`date_to` (on `purchase_date`), `number` (`P-000012` or `12`). Search reference, supplier, note. |
+| `GET/PUT purchases/{id}/` | view / manage | PUT replaces a draft's details and lines; a received or cancelled purchase is a 400. No PATCH or DELETE. |
+| `POST purchases/{id}/receive/` | manage | Returns the purchase with each line's batch. |
+| `POST purchases/{id}/cancel/` | manage | `{reason}`. |
+| `GET/POST/PATCH/DELETE expense-categories/…` | view / manage / delete | DELETE is a 409 when the category has expenses. |
+| `GET/POST/PATCH/DELETE expenses/…` | view / manage / delete | Filters `category`, `date_from`/`date_to` (on `expense_date`). Search description, paid_to. `has_receipt` instead of a file URL. |
+| `GET/PUT/DELETE expenses/{id}/receipt/` | view / manage / manage | PUT is multipart `receipt`. |
+| `GET expenses/summary/` | view | `?date_from&date_to` (default today): `total`, `count`, `by_category`. |
+
+## S2.6 Frontend
+- **`/purchases`:** a list with status, supplier and date filters, and search by number, supplier or reference.
+- **`/purchases/new` and `/purchases/:id/edit`:**
+  - pick products as on the sale screen
+  - quantity and unit cost, prefilled from the product's cost
+  - batch number and expiry only for products that track expiry
+  - a live total
+  - **Save draft** or **Save & receive**.
+- **`/purchases/:id`:** lines and batches. On a draft: **Receive** (with confirmation), **Edit** and **Cancel** (needs a reason).
+- **`/expenses`:**
+  - the period total (this month by default) and a breakdown by category
+  - a list with category and date filters
+  - an add/edit dialog with receipt upload, view (fetched with the session token) and remove
+  - delete only with `expenses.delete`
+  - a Categories dialog.
+- **Dashboard:** the period selector, plus the Expenses and Net profit tiles.
+- **Navigation:** Purchases and Expenses links, each gated by its permission.
+- **Shared code:** `lib/purchases.ts` (line checks and totals in cents) and `lib/dates.ts` (period ranges).
+
+## S2.7 Tests
+
+### Backend: `purchases/tests/`
+- Drafts: totals, numbering per business, editing, line validation, existing batches.
+- Receiving:
+  - new and existing batches and the DEFAULT batch
+  - `PURCHASE` movements and cost updates
+  - sale snapshots before and after a receive
+  - a received purchase can't change
+  - expiry tracking changed after drafting
+  - **a forced failure on the 2nd line rolls back** movements, batches, cost and status
+  - NFR-9 reconciliation.
+- Cancel; filters; 403 for a role without the codenames; Admin can receive.
+- Isolation: 404 on detail, PUT, receive and cancel; another business's supplier and product ids are refused; lists are empty.
+
+### Backend: `expenses/tests/`
+- Default categories; category CRUD and the 409.
+- Expenses: CRUD, positive amounts, filters, summary by category, Admin can't delete, 403s.
+- Receipts:
+  - PNG and PDF are accepted and downloaded with safe headers
+  - a replaced file is removed
+  - fake PDF, text, disguised PHP and oversize files are refused
+  - receipts are stored outside `MEDIA_ROOT`
+  - viewer permissions.
+- Net profit in the sales summary, and `null` without `expenses.view`.
+- Isolation: 404 on expense, category and receipt GET/PUT/DELETE; another business's category is refused; lists and summaries are empty.
+
+### Frontend
+- Purchase line maths and period ranges.
+- Purchases list states.
+- Purchase form: the request body, expiry fields shown only when tracked, the server error.
+- Purchase detail: receive flow, gating, cancel validation.
+- Expenses: list and total, empty and error states, validation, edit with server errors, delete gating and flow.
+- Dashboard tiles and period.
+- Nav gating.
+
+## S2.8 Known gaps
+- [ ] No supplier payments or credit (what the business owes suppliers).
+- [ ] A received purchase can't be reversed; correct stock with adjustments.
+- [ ] Cost price is "latest cost", not a weighted average.
+- [ ] Only cash as an expense method.
+- [ ] Receipts are stored on the backend's local disk (`PRIVATE_MEDIA_ROOT`). Production needs private object storage, or a persistent volume and backups.
+- [ ] Expense categories can be added and deleted from the UI, but not renamed. The API supports PATCH.
+- [ ] Expense edits and deletes aren't audit-logged yet (FR-20, Phase 4).
+

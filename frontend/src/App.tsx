@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
+import { useTranslation } from 'react-i18next'
 import { createBrowserRouter, Link, RouterProvider } from 'react-router'
 
 import { AppShell } from '@/components/layout/app-shell'
@@ -46,6 +47,20 @@ const router = createBrowserRouter([
             lazy: () => import('@/pages/sale-detail').then((m) => ({ Component: m.SaleDetailPage })),
           },
           { path: '/customers', lazy: () => import('@/pages/customers').then((m) => ({ Component: m.CustomersPage })) },
+          { path: '/purchases', lazy: () => import('@/pages/purchases').then((m) => ({ Component: m.PurchasesPage })) },
+          {
+            path: '/purchases/new',
+            lazy: () => import('@/pages/purchase-form').then((m) => ({ Component: m.PurchaseFormPage })),
+          },
+          {
+            path: '/purchases/:id',
+            lazy: () => import('@/pages/purchase-detail').then((m) => ({ Component: m.PurchaseDetailPage })),
+          },
+          {
+            path: '/purchases/:id/edit',
+            lazy: () => import('@/pages/purchase-form').then((m) => ({ Component: m.PurchaseFormPage })),
+          },
+          { path: '/expenses', lazy: () => import('@/pages/expenses').then((m) => ({ Component: m.ExpensesPage })) },
           { path: '/products', lazy: () => import('@/pages/products').then((m) => ({ Component: m.ProductsPage })) },
           // The form stays eager: `key` remounts it when switching new ↔ edit.
           { path: '/products/new', element: <ProductFormPage /> },
@@ -61,17 +76,19 @@ const router = createBrowserRouter([
       },
     ],
   },
-  {
-    path: '*',
-    element: (
-      <AuthLayout title="Page not found" description="That page doesn't exist.">
-        <Link to="/" className="font-medium underline-offset-4 hover:underline">
-          Go to the dashboard
-        </Link>
-      </AuthLayout>
-    ),
-  },
+  { path: '*', element: <NotFoundPage /> },
 ])
+
+function NotFoundPage() {
+  const { t } = useTranslation()
+  return (
+    <AuthLayout title={t('common.pageNotFound')} description={t('common.pageNotFoundText')}>
+      <Link to="/" className="font-medium underline-offset-4 hover:underline">
+        {t('common.goToDashboard')}
+      </Link>
+    </AuthLayout>
+  )
+}
 
 export default function App() {
   return (

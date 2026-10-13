@@ -12,7 +12,7 @@ export function applyServerErrors<T extends FieldValues>(
   fields: readonly Path<T>[],
 ) {
   if (!(error instanceof ApiError)) {
-    setError('root.server', { message: 'Something went wrong. Please try again.' })
+    setError('root.server', { message: 'common.somethingWrongRetry' })
     return
   }
   const fieldErrors = error.fieldErrors()

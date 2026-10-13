@@ -1,5 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
@@ -51,9 +52,10 @@ export function DataList<T>({
   empty,
   label,
 }: DataListProps<T>) {
+  const { t } = useTranslation()
   if (query.isPending) {
     return (
-      <div className="grid gap-2" role="status" aria-label={`Loading ${label}`}>
+      <div className="grid gap-2" role="status" aria-label={t('common.loadingLabel', { label })}>
         {Array.from({ length: 5 }, (_, i) => (
           <Skeleton key={i} className="h-14" />
         ))}
@@ -64,9 +66,9 @@ export function DataList<T>({
   if (query.isError) {
     return (
       <div className="grid justify-items-start gap-3">
-        <FormError message={query.error?.message ?? `Could not load ${label}.`} />
+        <FormError message={query.error?.message ?? t('common.couldNotLoadList', { label })} />
         <Button variant="outline" size="lg" onClick={() => query.refetch()}>
-          Try again
+          {t('common.tryAgain')}
         </Button>
       </div>
     )
@@ -124,15 +126,13 @@ export function DataList<T>({
       </ul>
 
       {pages > 1 && (
-        <nav className="flex items-center justify-between gap-2" aria-label="Pagination">
-          <p className="text-muted-foreground text-sm">
-            Page {page} of {pages} · {count} total
-          </p>
+        <nav className="flex items-center justify-between gap-2" aria-label={t('common.pagination')}>
+          <p className="text-muted-foreground text-sm">{t('common.pageOf', { page, pages, count })}</p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="icon-lg"
-              aria-label="Previous page"
+              aria-label={t('common.previousPage')}
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
@@ -141,7 +141,7 @@ export function DataList<T>({
             <Button
               variant="outline"
               size="icon-lg"
-              aria-label="Next page"
+              aria-label={t('common.nextPage')}
               disabled={page >= pages}
               onClick={() => onPageChange(page + 1)}
             >

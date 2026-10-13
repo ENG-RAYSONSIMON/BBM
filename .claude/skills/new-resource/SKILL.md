@@ -1,6 +1,6 @@
 ---
 name: new-resource
-description: Checklist for adding a new tenant-scoped model + API endpoint (and optionally its frontend page) in BBM, e.g. expenses, purchases, sales, customers. Use when planning or implementing any new backend resource.
+description: Checklist for adding a new tenant-scoped model + API endpoint (and optionally its frontend page) in BBM, e.g. reports, audit log, notifications, supplier payments. Use when planning or implementing any new backend resource.
 ---
 
 # Adding a tenant-scoped resource
@@ -19,6 +19,9 @@ permissions, tests, frontend pages) and wait for approval before writing code.
 - [ ] Line items (sale/purchase) snapshot price and cost columns.
 - [ ] Index `(business, created_at)` if it will be listed/reported by date.
 - [ ] Anything touching stock calls `inventory.services.record_movement()`.
+- [ ] File uploads: validator in `<app>/validators.py` (type + size limit from
+      `.env`). Non-public files use private storage like `expenses` receipts
+      (`PrivateStorage`, served only by a permissioned view).
 - [ ] New app? Add it to `INSTALLED_APPS` and include its urls under
       `/api/v1/` in `config/urls.py` with a namespace.
 
@@ -26,7 +29,8 @@ permissions, tests, frontend pages) and wait for approval before writing code.
 - [ ] Codenames in `accounts/rbac.py` (`PERMISSIONS`, `DEFAULT_ROLE_PERMISSIONS`;
       Admin never gets `.delete`).
 - [ ] Data migration in `accounts/` seeding the codenames and granting them
-      to existing Owner/Admin system roles — copy `0004_phase2_permissions.py`,
+      to existing Owner/Admin system roles — copy the latest,
+      `0006_phase3_purchases_expenses_permissions.py`,
       literal codenames, explicit `business_id`.
 - [ ] Mirror in `frontend/src/lib/types.ts` `PERMISSIONS`.
 
@@ -58,7 +62,16 @@ permissions, tests, frontend pages) and wait for approval before writing code.
       `components/layout/sidebar-content.tsx` gated by permission.
 - [ ] Vitest tests with `mockFetch` + `renderWithAuth`.
 
-## 6. Docs and handoff
-- [ ] Update README (endpoint table, test counts) and the current phase
-      summary in `docs/`.
+## 6. Languages (Kiswahili / English)
+- [ ] Backend: every user-visible message uses `_()` / `gettext_lazy` with
+      named placeholders. Run `makemessages -l sw` (command in README §7),
+      fill in the Kiswahili (simple, everyday words), run `compilemessages`.
+      `sales.tests.test_i18n` fails otherwise.
+- [ ] Frontend: no hard-coded text; every key added to both
+      `src/i18n/en.ts` and `src/i18n/sw.ts`.
+
+## 7. Docs and handoff
+- [ ] Update README (endpoint table, "Current state", test counts matching
+      the real numbers from `verify`) and the current phase summary in
+      `docs/` (create `PHASE_N_SUMMARY.md` for a new phase).
 - [ ] Run the `verify` skill, then tell the user what to test manually.

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -16,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { useTranslateMessage } from '@/i18n'
 import { api } from '@/lib/api'
 import { useRefOptions } from '@/lib/catalog'
 import { applyServerErrors } from '@/lib/forms'
@@ -59,6 +61,7 @@ function toFormValues(product: Product): ProductFormInput {
 /** /products/new and /products/:id/edit. */
 export function ProductFormPage() {
   const { id } = useParams()
+  const { t } = useTranslation()
   const editing = Boolean(id)
   const productQuery = useQuery({
     queryKey: ['product', id],
@@ -68,7 +71,7 @@ export function ProductFormPage() {
 
   if (editing && productQuery.isPending) {
     return (
-      <div className="mx-auto grid max-w-3xl gap-4" role="status" aria-label="Loading product">
+      <div className="mx-auto grid max-w-3xl gap-4" role="status" aria-label={t('products.loadingProduct')}>
         <Skeleton className="h-10 w-1/2" />
         <Skeleton className="h-96" />
       </div>
@@ -79,7 +82,7 @@ export function ProductFormPage() {
       <div className="mx-auto grid max-w-3xl justify-items-start gap-3">
         <FormError message={productQuery.error.message} />
         <Button variant="outline" size="lg" asChild>
-          <Link to="/products">Back to products</Link>
+          <Link to="/products">{t('products.backToProducts')}</Link>
         </Button>
       </div>
     )
@@ -89,6 +92,8 @@ export function ProductFormPage() {
 
 function ProductForm({ product }: { product?: Product }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const translate = useTranslateMessage()
   const queryClient = useQueryClient()
   const categories = useRefOptions('categories')
   const brands = useRefOptions('brands')
@@ -151,12 +156,12 @@ function ProductForm({ product }: { product?: Product }) {
         await api(`/products/${saved.id}/image/`, { method: 'DELETE' })
       }
     } catch (error) {
-      toast.error(`Product saved, but the image wasn't: ${(error as Error).message}`)
+      toast.error(t('products.imageNotSaved', { error: (error as Error).message }))
     }
 
     await queryClient.invalidateQueries({ queryKey: ['products'] })
     await queryClient.invalidateQueries({ queryKey: ['product', saved.id] })
-    toast.success(product ? 'Product updated.' : 'Product added.')
+    toast.success(product ? t('products.updated') : t('products.added'))
     navigate(`/products/${saved.id}`, { replace: true })
   }
 
@@ -164,19 +169,19 @@ function ProductForm({ product }: { product?: Product }) {
 
   return (
     <form className="mx-auto grid max-w-3xl gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-      <PageHeader title={product ? `Edit ${product.name}` : 'Add product'} />
+      <PageHeader title={product ? t('products.editTitle', { name: product.name }) : t('products.add')} />
       <FormError message={errors.root?.server?.message} />
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t('products.details')}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <FormField label="Name" error={errors.name?.message} {...form.register('name')} />
+            <FormField label={t('common.name')} error={errors.name?.message} {...form.register('name')} />
           </div>
-          <FormField label="SKU (optional)" error={errors.sku?.message} {...form.register('sku')} />
-          <FormField label="Barcode (optional)" inputMode="numeric" error={errors.barcode?.message}
+          <FormField label={t('products.skuOptional')} error={errors.sku?.message} {...form.register('sku')} />
+          <FormField label={t('products.barcodeOptional')} inputMode="numeric" error={errors.barcode?.message}
             {...form.register('barcode')} />
           {(['category', 'brand', 'supplier'] as const).map((field) => {
             const options = { category: categories, brand: brands, supplier: suppliers }[field].data
@@ -188,20 +193,20 @@ function ProductForm({ product }: { product?: Product }) {
                 render={({ field: input }) => (
                   <div className="grid gap-1.5">
                     <RefSelect
-                      label={field[0].toUpperCase() + field.slice(1)}
+                      label={t(`common.${field}`)}
                       value={input.value}
                       onChange={input.onChange}
                       options={options}
                     />
-                    {errors[field] && <p className="text-destructive text-sm">{errors[field]?.message}</p>}
+                    {errors[field] && <p className="text-destructive text-sm">{translate(errors[field]?.message)}</p>}
                   </div>
                 )}
               />
             )
           })}
-          <FormField label="Unit" hint="e.g. pcs, bottle, tube" error={errors.unit?.message} {...form.register('unit')} />
+          <FormField label={t('products.unit')} hint={t('products.unitHint')} error={errors.unit?.message} {...form.register('unit')} />
           <div className="grid gap-1.5 sm:col-span-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description">{t('common.descriptionOptional')}</Label>
             <Textarea id="description" rows={3} {...form.register('description')} />
           </div>
         </CardContent>
@@ -209,18 +214,18 @@ function ProductForm({ product }: { product?: Product }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Prices and stock rules</CardTitle>
-          <CardDescription>Prices in TZS. Changing them never changes past sales.</CardDescription>
+          <CardTitle>{t('products.pricesTitle')}</CardTitle>
+          <CardDescription>{t('products.pricesText')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Selling price" inputMode="decimal" error={errors.selling_price?.message}
+          <FormField label={t('products.sellingPrice')} inputMode="decimal" error={errors.selling_price?.message}
             {...form.register('selling_price')} />
-          <FormField label="Cost (buying) price" inputMode="decimal" error={errors.cost_price?.message}
+          <FormField label={t('products.costBuyingPrice')} inputMode="decimal" error={errors.cost_price?.message}
             {...form.register('cost_price')} />
           <FormField
-            label="Low-stock alert at (optional)"
+            label={t('products.lowStockOptional')}
             inputMode="numeric"
-            hint="Leave empty to use the business setting."
+            hint={t('products.lowStockOptionalHint')}
             error={errors.reorder_level?.message}
             {...form.register('reorder_level')}
           />
@@ -231,9 +236,9 @@ function ProductForm({ product }: { product?: Product }) {
               <div className="flex items-start gap-3 sm:pt-6">
                 <Switch id="tracks_expiry" checked={field.value} onCheckedChange={field.onChange} />
                 <div className="grid gap-1">
-                  <Label htmlFor="tracks_expiry">Track expiry dates</Label>
+                  <Label htmlFor="tracks_expiry">{t('products.trackExpiry')}</Label>
                   <p className={errors.tracks_expiry ? 'text-destructive text-sm' : 'text-muted-foreground text-sm'}>
-                    {errors.tracks_expiry?.message ?? 'Each batch gets an expiry date.'}
+                    {translate(errors.tracks_expiry?.message) ?? t('products.trackExpiryHint')}
                   </p>
                 </div>
               </div>
@@ -244,12 +249,12 @@ function ProductForm({ product }: { product?: Product }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Image</CardTitle>
-          <CardDescription>JPEG, PNG or WebP, up to 2 MB.</CardDescription>
+          <CardTitle>{t('products.image')}</CardTitle>
+          <CardDescription>{t('products.imageHint')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
           {shownImage ? (
-            <img src={shownImage} alt="Product" className="size-28 rounded-lg border object-cover" />
+            <img src={shownImage} alt={t('products.productImage')} className="size-28 rounded-lg border object-cover" />
           ) : (
             <div className="bg-muted text-muted-foreground flex size-28 items-center justify-center rounded-lg">
               <ImageIcon className="size-8" />
@@ -259,12 +264,12 @@ function ProductForm({ product }: { product?: Product }) {
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="lg" asChild>
                 <label className="cursor-pointer">
-                  {shownImage ? 'Change image' : 'Choose image'}
+                  {shownImage ? t('products.changeImage') : t('products.chooseImage')}
                   <input
                     type="file"
                     accept={IMAGE_TYPES.join(',')}
                     className="sr-only"
-                    aria-label="Product image"
+                    aria-label={t('products.productImage')}
                     onChange={(event) => {
                       pickFile(event.target.files?.[0])
                       event.target.value = ''
@@ -284,21 +289,21 @@ function ProductForm({ product }: { product?: Product }) {
                   }}
                 >
                   <XIcon />
-                  Remove
+                  {t('common.remove')}
                 </Button>
               )}
             </div>
-            {imageError && <p className="text-destructive text-sm" role="alert">{imageError}</p>}
+            {imageError && <p className="text-destructive text-sm" role="alert">{translate(imageError)}</p>}
           </div>
         </CardContent>
       </Card>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" size="lg" asChild>
-          <Link to={cancelTo}>Cancel</Link>
+          <Link to={cancelTo}>{t('common.cancel')}</Link>
         </Button>
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : product ? 'Save changes' : 'Add product'}
+          {isSubmitting ? t('common.saving') : product ? t('common.saveChanges') : t('products.add')}
         </Button>
       </div>
     </form>

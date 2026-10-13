@@ -1,6 +1,14 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from .models import Brand, Category, Product, Supplier
+
+
+ALREADY_USED = {
+    "name": _("This name is already used. Choose another one."),
+    "sku": _("This SKU is already used by another product."),
+    "barcode": _("This barcode is already used by another product."),
+}
 
 
 class UniqueInBusinessMixin:
@@ -21,10 +29,7 @@ class UniqueInBusinessMixin:
             if self.instance is not None:
                 clash = clash.exclude(pk=self.instance.pk)
             if clash.exists():
-                label = model._meta.get_field(field).verbose_name
-                raise serializers.ValidationError(
-                    {field: [f"A {model._meta.verbose_name} with this {label} already exists."]}
-                )
+                raise serializers.ValidationError({field: [ALREADY_USED.get(field, ALREADY_USED["name"])]})
         return attrs
 
 
@@ -129,7 +134,7 @@ class ProductSerializer(UniqueInBusinessMixin, serializers.ModelSerializer):
         product = self.instance
         if product is not None and product.tracks_expiry != value and product.batches.exists():
             raise serializers.ValidationError(
-                "Can't change expiry tracking once the product has batches."
+                _("Can't change expiry tracking once the product has batches.")
             )
         return value
 

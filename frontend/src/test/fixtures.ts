@@ -1,4 +1,4 @@
-import type { Batch, Paginated, Product, SaleDetail } from '@/lib/types'
+import type { Batch, Expense, Paginated, Product, PurchaseDetail, SaleDetail } from '@/lib/types'
 
 export function page<T>(results: T[]): Paginated<T> {
   return { count: results.length, next: null, previous: null, results }
@@ -87,3 +87,68 @@ export function sale(overrides: Partial<SaleDetail> = {}): SaleDetail {
     ...overrides,
   }
 }
+
+export function purchase(overrides: Partial<PurchaseDetail> = {}): PurchaseDetail {
+  return {
+    id: 'pu1',
+    number: 3,
+    purchase_number: 'P-000003',
+    status: 'DRAFT',
+    supplier: 'sup1',
+    supplier_name: 'Dar Cosmetics',
+    reference: 'INV-77',
+    purchase_date: '2026-10-12',
+    note: '',
+    total: '75000.00',
+    item_count: 1,
+    created_by: 'u1',
+    created_by_name: 'Amina',
+    received_at: null,
+    created_at: '2026-10-12T08:00:00Z',
+    items: [
+      {
+        id: 'pi1',
+        product: 'p1',
+        product_name: 'Shea Butter',
+        tracks_expiry: true,
+        quantity: 10,
+        unit_cost: '7500.00',
+        line_total: '75000.00',
+        batch_number: 'SB-01',
+        expiry_date: '2027-06-30',
+        batch: null,
+      },
+    ],
+    received_by: null,
+    received_by_name: '',
+    cancelled_at: null,
+    cancelled_by: null,
+    cancelled_by_name: '',
+    cancel_reason: '',
+    ...overrides,
+  }
+}
+
+export function expense(overrides: Partial<Expense> = {}): Expense {
+  return {
+    id: 'e1',
+    category: 'cat-rent',
+    category_name: 'Rent',
+    amount: '50000.00',
+    expense_date: '2026-10-12',
+    description: 'October rent',
+    paid_to: 'Landlord',
+    method: 'CASH',
+    has_receipt: false,
+    recorded_by: 'u1',
+    recorded_by_name: 'Amina',
+    created_at: '2026-10-12T08:00:00Z',
+    updated_at: '2026-10-12T08:00:00Z',
+    ...overrides,
+  }
+}
+
+export const EXPENSE_CATEGORIES = page([
+  { id: 'cat-rent', name: 'Rent', description: '', created_at: '', updated_at: '' },
+  { id: 'cat-transport', name: 'Transport', description: '', created_at: '', updated_at: '' },
+])

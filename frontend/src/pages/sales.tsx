@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { PlusIcon, XIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { DataList, PAGE_SIZE } from '@/components/data-list'
 import type { Column } from '@/components/data-list'
@@ -18,15 +19,12 @@ import { PERMISSIONS } from '@/lib/types'
 import type { Customer, Paginated, Sale } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
 
-const PAYMENT_STATUS_FILTERS = [
-  { id: 'PAID', name: 'Paid' },
-  { id: 'PARTIAL', name: 'Part paid' },
-  { id: 'UNPAID', name: 'Unpaid' },
-  { id: 'VOID', name: 'Void' },
-]
+const PAYMENT_STATUSES = ['PAID', 'PARTIAL', 'UNPAID', 'VOID'] as const
 
 export function SalesPage() {
   const { can } = useAuth()
+  const { t } = useTranslation()
+  const PAYMENT_STATUS_FILTERS = PAYMENT_STATUSES.map((id) => ({ id, name: t(`sales.status_${id}`) }))
   const navigate = useNavigate()
   const list = useListParams()
   const filters = {
@@ -61,37 +59,39 @@ export function SalesPage() {
     <Button asChild size="lg">
       <Link to="/pos">
         <PlusIcon />
-        New sale
+        {t('sales.newSale')}
       </Link>
     </Button>
   )
 
   const columns: Column<Sale>[] = [
-    { header: 'Receipt', cell: (s) => <span className="font-medium">{s.receipt_number}</span> },
-    { header: 'When', cell: (s) => formatDateTime(s.created_at) },
-    { header: 'Customer', cell: (s) => s.customer_name ?? '—' },
-    { header: 'Total', cell: (s) => formatTZS(s.total), className: 'text-right tabular-nums' },
+    { header: t('sales.receipt'), cell: (s) => <span className="font-medium">{s.receipt_number}</span> },
+    { header: t('common.when'), cell: (s) => formatDateTime(s.created_at) },
+    { header: t('common.customer'), cell: (s) => s.customer_name ?? '—' },
+    { header: t('common.total'), cell: (s) => formatTZS(s.total), className: 'text-right tabular-nums' },
     {
-      header: 'Owed',
+      header: t('sales.owed'),
       cell: (s) => (Number(s.balance) > 0 ? formatTZS(s.balance) : '—'),
       className: 'text-right tabular-nums',
     },
-    { header: 'Status', cell: (s) => <PaymentStatusBadge status={s.payment_status} />, className: 'text-right' },
+    { header: t('common.status'), cell: (s) => <PaymentStatusBadge status={s.payment_status} />, className: 'text-right' },
   ]
 
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
-      <PageHeader title="Sales" description="Every sale, what was paid and what is still owed." actions={sellButton} />
+      <PageHeader title={t('sales.title')} description={t('sales.subtitle')} actions={sellButton} />
 
       {filters.customer && (
         <div className="flex items-center gap-2 text-sm">
           <span>
-            Customer: <span className="font-medium">{customer.data?.name ?? '…'}</span>
-            {customer.data && Number(customer.data.balance) > 0 && ` · owes ${formatTZS(customer.data.balance)}`}
+            {t('sales.customerFilter')} <span className="font-medium">{customer.data?.name ?? '…'}</span>
+            {customer.data &&
+              Number(customer.data.balance) > 0 &&
+              t('sales.customerOwes', { amount: formatTZS(customer.data.balance) })}
           </span>
           <Button variant="ghost" size="sm" onClick={() => list.set('customer', '')}>
             <XIcon />
-            Clear
+            {t('sales.clear')}
           </Button>
         </div>
       )}
@@ -101,16 +101,16 @@ export function SalesPage() {
           className="sm:col-span-2 lg:col-span-4"
           value={list.search}
           onChange={list.setSearch}
-          placeholder="Search receipt number, customer name or phone"
+          placeholder={t('sales.searchPlaceholder')}
         />
-        <RefSelect hideLabel label="Payment" noneLabel="Any payment status" value={filters.payment_status}
+        <RefSelect hideLabel label={t('sales.payment')} noneLabel={t('sales.anyPayment')} value={filters.payment_status}
           onChange={(v) => list.set('payment', v)} options={PAYMENT_STATUS_FILTERS} />
-        <FormField label="From" type="date" value={filters.date_from} onChange={(e) => list.set('from', e.target.value)} />
-        <FormField label="To" type="date" value={filters.date_to} onChange={(e) => list.set('to', e.target.value)} />
+        <FormField label={t('common.from')} type="date" value={filters.date_from} onChange={(e) => list.set('from', e.target.value)} />
+        <FormField label={t('common.to')} type="date" value={filters.date_to} onChange={(e) => list.set('to', e.target.value)} />
       </div>
 
       <DataList
-        label="sales"
+        label={t('sales.listLabel')}
         query={query}
         columns={columns}
         rowKey={(s) => s.id}
@@ -119,8 +119,8 @@ export function SalesPage() {
         onPageChange={list.setPage}
         empty={
           filtered
-            ? { title: 'No sales match', description: 'Try a different search or clear the filters.' }
-            : { title: 'No sales yet', description: 'Record your first sale from the sale screen.', action: sellButton }
+            ? { title: t('sales.noMatch'), description: t('common.noMatchHint') }
+            : { title: t('sales.empty'), description: t('sales.emptyText'), action: sellButton }
         }
         card={(s) => (
           <Link to={`/sales/${s.id}`}>
@@ -136,7 +136,7 @@ export function SalesPage() {
                 </span>
                 <PaymentStatusBadge status={s.payment_status} />
               </div>
-              {Number(s.balance) > 0 && <p>Owes {formatTZS(s.balance)}</p>}
+              {Number(s.balance) > 0 && <p>{t('sales.owes', { amount: formatTZS(s.balance) })}</p>}
             </Card>
           </Link>
         )}

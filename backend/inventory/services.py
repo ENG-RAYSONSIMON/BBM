@@ -22,6 +22,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from accounts.models import BusinessSettings
 from catalog.models import Product, ProductBatch
@@ -156,24 +157,27 @@ def resolve_batch(product, *, batch=None, batch_number="", expiry_date=None, rec
     by number. Products that don't track expiry use a single DEFAULT batch."""
     if batch is not None:
         if batch.product_id != product.pk:
-            raise ValidationError({"batch": "This batch belongs to a different product."})
+            raise ValidationError({"batch": _("This batch belongs to a different product.")})
         return batch
 
     if not batch_number:
         if product.tracks_expiry:
-            raise ValidationError({"batch_number": "Choose a batch or enter a new batch number."})
+            raise ValidationError({"batch_number": _("Choose a batch or enter a new batch number.")})
         batch_number = ProductBatch.DEFAULT_NUMBER
 
     existing = ProductBatch.objects.filter(product=product, batch_number=batch_number).first()
     if existing:
         if expiry_date and existing.expiry_date != expiry_date:
             raise ValidationError(
-                {"expiry_date": f"Batch {batch_number} already exists with a different expiry date."}
+                {
+                    "expiry_date": _("Batch %(batch)s already exists with a different expiry date.")
+                    % {"batch": batch_number}
+                }
             )
         return existing
 
     if product.tracks_expiry and not expiry_date:
-        raise ValidationError({"expiry_date": "New batches of this product need an expiry date."})
+        raise ValidationError({"expiry_date": _("New batches of this product need an expiry date.")})
     return ProductBatch.objects.create(
         product=product,
         batch_number=batch_number,

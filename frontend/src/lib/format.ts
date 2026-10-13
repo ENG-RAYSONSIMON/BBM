@@ -1,3 +1,5 @@
+import { currentLanguage } from '@/i18n'
+
 const tzs = new Intl.NumberFormat('en-TZ', {
   style: 'currency',
   currency: 'TZS',
@@ -10,24 +12,36 @@ export function formatTZS(value: string | number): string {
   return Number.isFinite(amount) ? tzs.format(amount) : '—'
 }
 
-const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-const dateTimeFormat = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})
+const DATE_LOCALES = { en: 'en-GB', sw: 'sw-TZ' } as const
+
+const dateFormats = new Map<string, Intl.DateTimeFormat>()
+
+/** Date formatters follow the UI language ("13 Oct 2026" / "13 Okt 2026"). */
+function formatter(withTime: boolean): Intl.DateTimeFormat {
+  const language = currentLanguage()
+  const key = `${language}:${withTime}`
+  let format = dateFormats.get(key)
+  if (!format) {
+    format = new Intl.DateTimeFormat(DATE_LOCALES[language], {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+    })
+    dateFormats.set(key, format)
+  }
+  return format
+}
 
 /** API dates ("2026-10-06") are calendar dates: format without time-zone shifts. */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
   const [y, m, d] = value.slice(0, 10).split('-').map(Number)
-  return dateFormat.format(new Date(y, m - 1, d))
+  return formatter(false).format(new Date(y, m - 1, d))
 }
 
 export function formatDateTime(value: string): string {
-  return dateTimeFormat.format(new Date(value))
+  return formatter(true).format(new Date(value))
 }
 
 /** "+5" / "−3" with a real minus sign. */

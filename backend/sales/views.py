@@ -4,6 +4,7 @@ import django_filters
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, mixins, status, viewsets
@@ -11,7 +12,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.models import User, UserRole
-from accounts.rbac import SALES_CREATE, SALES_VIEW, SALES_VOID
+from accounts.rbac import EXPENSES_VIEW, SALES_CREATE, SALES_VIEW, SALES_VOID
+from accounts.services import get_permission_codenames
 from core.views import TenantModelViewSet
 
 from .models import Customer, Sale
@@ -212,7 +214,7 @@ class SaleVoidView(SaleActionView):
     responses=SalesSummarySerializer,
 )
 class SalesSummaryView(generics.GenericAPIView):
-    """FR-16/FR-17 dashboard figures."""
+    """FR-16/FR-17 dashboard figures, including net profit."""
 
     serializer_class = SalesSummarySerializer
     required_permissions = (SALES_VIEW,)
@@ -221,8 +223,12 @@ class SalesSummaryView(generics.GenericAPIView):
         date_from = self._date("date_from", timezone.localdate())
         date_to = self._date("date_to", date_from)
         if date_to < date_from:
-            raise ValidationError({"date_to": ["The end date is before the start date."]})
-        return Response(SalesSummarySerializer(sales_summary(date_from, date_to)).data)
+            raise ValidationError({"date_to": [_("The end date is before the start date.")]})
+        summary = sales_summary(date_from, date_to)
+        # Expense figures follow the expenses permission, not the sales one.
+        if EXPENSES_VIEW not in get_permission_codenames(request.membership):
+            summary["expenses"] = summary["net_profit"] = None
+        return Response(SalesSummarySerializer(summary).data)
 
     def _date(self, name, default):
         value = self.request.query_params.get(name)
@@ -232,7 +238,7 @@ class SalesSummaryView(generics.GenericAPIView):
         try:
             return field.to_internal_value(value)
         except ValidationError:
-            raise ValidationError({name: ["Use a date like 2026-10-10."]})
+            raise ValidationError({name: [_("Use a date like 2026-10-10.")]})
 
 
 class CustomerFilter(django_filters.FilterSet):
@@ -266,7 +272,7 @@ class CustomerViewSet(TenantModelViewSet):
     search_fields = ("name", "phone")
     ordering_fields = ("name", "balance", "created_at")
     ordering = ("name",)
-    protected_message = "This customer has sales and can't be deleted."
+    protected_message = _("This customer has sales and can't be deleted.")
 
     def get_queryset(self):
         return with_customer_balance(Customer.objects.all())

@@ -30,7 +30,7 @@ export type CartTotals = {
   subtotal: number
   discount: number
   total: number
-  /** Index → message for lines whose discount is invalid. */
+  /** Index → i18n key for lines whose discount is invalid. */
   lineErrors: Record<number, string>
 }
 
@@ -44,9 +44,9 @@ export function cartTotals(lines: CartLine[]): CartTotals {
     const lineDiscount = toCents(line.discount)
     subtotal += gross
     if (lineDiscount === null) {
-      lineErrors[index] = 'Use a number like 1000.'
+      lineErrors[index] = 'errors.moneyFormat'
     } else if (lineDiscount > gross) {
-      lineErrors[index] = 'The discount is more than the line.'
+      lineErrors[index] = 'errors.discountTooBig'
     } else {
       discount += lineDiscount
     }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { DataList, PAGE_SIZE } from '@/components/data-list'
 import type { Column } from '@/components/data-list'
@@ -14,34 +15,30 @@ import { formatDate } from '@/lib/format'
 import type { ExpiringBatch, Paginated, Product } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
 
-const VIEWS = [
-  { id: 'low', label: 'Low stock' },
-  { id: '7', label: 'Expiring ≤ 7 days' },
-  { id: '30', label: '≤ 30 days' },
-  { id: '60', label: '≤ 60 days' },
-  { id: 'expired', label: 'Expired' },
-] as const
+// Labels are keys: inventory.view_<id>.
+const VIEWS = ['low', '7', '30', '60', 'expired'] as const
 
 /** FR-9: low-stock and expiry views, computed live by the API. */
 export function InventoryPage() {
   const list = useListParams()
-  const view = VIEWS.some((v) => v.id === list.get('view')) ? list.get('view') : 'low'
+  const { t } = useTranslation()
+  const view = (VIEWS as readonly string[]).includes(list.get('view')) ? list.get('view') : 'low'
 
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
-      <PageHeader title="Inventory alerts" description="Products running low and batches near or past expiry." />
+      <PageHeader title={t('inventory.title')} description={t('inventory.subtitle')} />
       <Tabs value={view} onValueChange={(next) => list.set('view', next === 'low' ? '' : next)}>
         <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
           <TabsList>
             {VIEWS.map((v) => (
-              <TabsTrigger key={v.id} value={v.id}>
-                {v.label}
+              <TabsTrigger key={v} value={v}>
+                {t(`inventory.view_${v}`)}
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
       </Tabs>
-      <SearchInput value={list.search} onChange={list.setSearch} placeholder="Search products" />
+      <SearchInput value={list.search} onChange={list.setSearch} placeholder={t('inventory.searchProducts')} />
       {view === 'low' ? <LowStockList /> : <ExpiryList view={view} />}
     </div>
   )
@@ -49,6 +46,7 @@ export function InventoryPage() {
 
 function LowStockList() {
   const list = useListParams()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const query = useQuery({
     queryKey: ['inventory', 'low-stock', list.page, list.search],
@@ -61,7 +59,7 @@ function LowStockList() {
 
   const columns: Column<Product>[] = [
     {
-      header: 'Product',
+      header: t('products.product'),
       cell: (p) => (
         <div className="flex items-center gap-3">
           <ProductThumb product={p} />
@@ -70,7 +68,7 @@ function LowStockList() {
       ),
     },
     {
-      header: 'In stock',
+      header: t('inventory.inStock'),
       cell: (p) => (
         <div className="flex items-center justify-end gap-2">
           <StockBadge status={p.stock_status} />
@@ -81,20 +79,20 @@ function LowStockList() {
       ),
       className: 'text-right',
     },
-    { header: 'Alert at', cell: (p) => `${p.threshold} ${p.unit}`, className: 'text-right' },
-    { header: 'Supplier', cell: (p) => p.supplier_detail?.name ?? '—' },
+    { header: t('inventory.alertAt'), cell: (p) => `${p.threshold} ${p.unit}`, className: 'text-right' },
+    { header: t('common.supplier'), cell: (p) => p.supplier_detail?.name ?? '—' },
   ]
 
   return (
     <DataList
-      label="low-stock products"
+      label={t('inventory.lowLabel')}
       query={query}
       columns={columns}
       rowKey={(p) => p.id}
       onRowClick={(p) => navigate(`/products/${p.id}`)}
       page={list.page}
       onPageChange={list.setPage}
-      empty={{ title: 'Nothing is running low', description: 'Products at or below their alert level show up here.' }}
+      empty={{ title: t('inventory.lowEmpty'), description: t('inventory.lowEmptyText') }}
       card={(p) => (
         <Link to={`/products/${p.id}`}>
           <Card className="flex-row items-center gap-3 p-3">
@@ -102,7 +100,7 @@ function LowStockList() {
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{p.name}</p>
               <p className="text-muted-foreground text-sm">
-                Alert at {p.threshold} {p.unit}
+                {t('inventory.alertAtValue', { count: p.threshold, unit: p.unit })}
               </p>
             </div>
             <div className="grid justify-items-end gap-1 text-sm">
@@ -120,6 +118,7 @@ function LowStockList() {
 
 function ExpiryList({ view }: { view: string }) {
   const list = useListParams()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const expired = view === 'expired'
   const query = useQuery({
@@ -137,16 +136,16 @@ function ExpiryList({ view }: { view: string }) {
   })
 
   const columns: Column<ExpiringBatch>[] = [
-    { header: 'Product', cell: (b) => <span className="font-medium">{b.product_name}</span> },
-    { header: 'Batch', cell: (b) => b.batch_number },
-    { header: 'Expiry', cell: (b) => formatDate(b.expiry_date) },
+    { header: t('products.product'), cell: (b) => <span className="font-medium">{b.product_name}</span> },
+    { header: t('common.batch'), cell: (b) => b.batch_number },
+    { header: t('common.expiry'), cell: (b) => formatDate(b.expiry_date) },
     { header: '', cell: (b) => <ExpiryBadge daysLeft={b.days_left} warnDays={366} /> },
-    { header: 'Units left', cell: (b) => b.stock_on_hand, className: 'text-right tabular-nums' },
+    { header: t('inventory.unitsLeft'), cell: (b) => b.stock_on_hand, className: 'text-right tabular-nums' },
   ]
 
   return (
     <DataList
-      label={expired ? 'expired batches' : 'expiring batches'}
+      label={expired ? t('inventory.expiredLabel') : t('inventory.expiringLabel')}
       query={query}
       columns={columns}
       rowKey={(b) => b.id}
@@ -155,8 +154,8 @@ function ExpiryList({ view }: { view: string }) {
       onPageChange={list.setPage}
       empty={
         expired
-          ? { title: 'No expired stock', description: 'Batches past their expiry date that still hold stock show up here.' }
-          : { title: `Nothing expires in the next ${view} days` }
+          ? { title: t('inventory.expiredEmpty'), description: t('inventory.expiredEmptyText') }
+          : { title: t('inventory.expiringEmpty', { days: view }) }
       }
       card={(b) => (
         <Link to={`/products/${b.product}`}>
@@ -166,7 +165,7 @@ function ExpiryList({ view }: { view: string }) {
               <ExpiryBadge daysLeft={b.days_left} warnDays={366} />
             </div>
             <p className="text-muted-foreground">
-              Batch {b.batch_number} · {formatDate(b.expiry_date)} · {b.stock_on_hand} left
+              {t('inventory.batchCard', { batch: b.batch_number, date: formatDate(b.expiry_date), count: b.stock_on_hand })}
             </p>
           </Card>
         </Link>

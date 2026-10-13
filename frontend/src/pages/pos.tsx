@@ -3,6 +3,7 @@ import { MinusIcon, PlusIcon, ShoppingCartIcon, Trash2Icon, UserIcon, XIcon } fr
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -36,6 +37,7 @@ function firstMessage(value: unknown): string | undefined {
 /** FR-11 point of sale: cart, discounts, cash received, change or credit. */
 export function PosPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [lines, setLines] = useState<Line[]>([])
@@ -114,8 +116,8 @@ export function PosPage() {
       const change = toCents(sale.payments[0]?.change_given ?? '0') ?? 0
       toast.success(
         change > 0
-          ? `${sale.receipt_number} saved. Give ${formatTZS(fromCents(change))} change.`
-          : `${sale.receipt_number} saved.`,
+          ? t('pos.savedChange', { receipt: sale.receipt_number, amount: formatTZS(fromCents(change)) })
+          : t('pos.saved', { receipt: sale.receipt_number }),
       )
       navigate(`/sales/${sale.id}`)
     } catch (err) {
@@ -129,7 +131,7 @@ export function PosPage() {
             err.message,
         )
       } else {
-        setError(err instanceof Error ? err.message : 'Something went wrong.')
+        setError(err instanceof Error ? err.message : t('common.somethingWrong'))
       }
       setSubmitting(false)
     }
@@ -137,14 +139,14 @@ export function PosPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
-      <PageHeader title="New sale" description="Add products, take the cash, and save the sale." />
+      <PageHeader title={t('pos.title')} description={t('pos.subtitle')} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_26rem]">
         {/* Product picker */}
-        <section className="grid content-start gap-3" aria-label="Products">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search name, SKU or barcode" />
+        <section className="grid content-start gap-3" aria-label={t('pos.products')}>
+          <SearchInput value={search} onChange={setSearch} placeholder={t('common.searchProducts')} />
           {products.isPending ? (
-            <div className="grid gap-2 sm:grid-cols-2" role="status" aria-label="Loading products">
+            <div className="grid gap-2 sm:grid-cols-2" role="status" aria-label={t('pos.loadingProducts')}>
               {Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="h-16" />
               ))}
@@ -153,7 +155,7 @@ export function PosPage() {
             <FormError message={products.error.message} />
           ) : products.data.count === 0 ? (
             <p className="text-muted-foreground text-sm">
-              {search ? 'No products match.' : 'No active products yet. Add products first.'}
+              {search ? t('common.noProductsMatch') : t('common.noActiveProducts')}
             </p>
           ) : (
             <ul className="grid gap-2 sm:grid-cols-2">
@@ -167,14 +169,16 @@ export function PosPage() {
                       className="hover:bg-muted/60 bg-card flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => add(product)}
                       disabled={left <= 0}
-                      aria-label={`Add ${product.name}`}
+                      aria-label={t('common.addItem', { name: product.name })}
                     >
                       <ProductThumb product={product} className="size-10" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{product.name}</p>
                         <p className="text-muted-foreground text-sm">
                           {formatTZS(product.selling_price)} ·{' '}
-                          {product.stock_on_hand > 0 ? `${product.stock_on_hand} ${product.unit} in stock` : 'Out of stock'}
+                          {product.stock_on_hand > 0
+                            ? t('common.inStockCount', { count: product.stock_on_hand, unit: product.unit })
+                            : t('common.outOfStock')}
                         </p>
                       </div>
                       <PlusIcon className="text-muted-foreground size-4 shrink-0" />
@@ -191,14 +195,14 @@ export function PosPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShoppingCartIcon className="size-5" />
-              Cart
+              {t('pos.cart')}
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             {lines.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Tap a product to add it.</p>
+              <p className="text-muted-foreground text-sm">{t('common.tapToAdd')}</p>
             ) : (
-              <ul className="divide-y" aria-label="Cart items">
+              <ul className="divide-y" aria-label={t('pos.cartItems')}>
                 {lines.map((line, index) => {
                   const gross = (toCents(line.product.selling_price) ?? 0) * line.quantity
                   const lineDiscount = toCents(line.discount) ?? 0
@@ -208,12 +212,14 @@ export function PosPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate font-medium">{line.product.name}</p>
-                          <p className="text-muted-foreground text-sm">{formatTZS(line.product.selling_price)} each</p>
+                          <p className="text-muted-foreground text-sm">
+                            {t('common.eachPrice', { price: formatTZS(line.product.selling_price) })}
+                          </p>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Remove ${line.product.name}`}
+                          aria-label={t('common.removeItem', { name: line.product.name })}
                           onClick={() => remove(line.product.id)}
                         >
                           <Trash2Icon />
@@ -224,14 +230,14 @@ export function PosPage() {
                           <Button
                             variant="outline"
                             size="icon"
-                            aria-label={`Fewer ${line.product.name}`}
+                            aria-label={t('pos.fewer', { name: line.product.name })}
                             disabled={line.quantity <= 1}
                             onClick={() => update(line.product.id, { quantity: line.quantity - 1 })}
                           >
                             <MinusIcon />
                           </Button>
                           <Input
-                            aria-label={`Quantity of ${line.product.name}`}
+                            aria-label={t('pos.quantityOf', { name: line.product.name })}
                             inputMode="numeric"
                             className="h-9 w-14 text-center tabular-nums"
                             value={line.quantity}
@@ -243,7 +249,7 @@ export function PosPage() {
                           <Button
                             variant="outline"
                             size="icon"
-                            aria-label={`More ${line.product.name}`}
+                            aria-label={t('pos.more', { name: line.product.name })}
                             disabled={line.quantity >= max}
                             onClick={() => update(line.product.id, { quantity: line.quantity + 1 })}
                           >
@@ -252,7 +258,7 @@ export function PosPage() {
                         </div>
                         <div className="grid flex-1 gap-1">
                           <label className="text-muted-foreground text-xs" htmlFor={`discount-${line.product.id}`}>
-                            Discount (TZS)
+                            {t('pos.discountTzs')}
                           </label>
                           <Input
                             id={`discount-${line.product.id}`}
@@ -269,7 +275,7 @@ export function PosPage() {
                         </p>
                       </div>
                       {totals.lineErrors[index] && (
-                        <p className="text-destructive text-sm">{totals.lineErrors[index]}</p>
+                        <p className="text-destructive text-sm">{t(totals.lineErrors[index] as never)}</p>
                       )}
                     </li>
                   )
@@ -278,28 +284,28 @@ export function PosPage() {
             )}
 
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 border-t pt-3 text-sm">
-              <dt className="text-muted-foreground">Subtotal</dt>
+              <dt className="text-muted-foreground">{t('common.subtotal')}</dt>
               <dd className="text-right tabular-nums">{formatTZS(fromCents(totals.subtotal))}</dd>
               {totals.discount > 0 && (
                 <>
-                  <dt className="text-muted-foreground">Discount</dt>
+                  <dt className="text-muted-foreground">{t('common.discount')}</dt>
                   <dd className="text-right tabular-nums">−{formatTZS(fromCents(totals.discount))}</dd>
                 </>
               )}
-              <dt className="text-base font-semibold">Total</dt>
-              <dd className="text-right text-base font-semibold tabular-nums" aria-label="Total">
+              <dt className="text-base font-semibold">{t('common.total')}</dt>
+              <dd className="text-right text-base font-semibold tabular-nums" aria-label={t('common.total')}>
                 {formatTZS(fromCents(totals.total))}
               </dd>
             </dl>
 
             <div className="grid gap-2">
               <FormField
-                label="Cash received"
+                label={t('pos.cashReceived')}
                 inputMode="decimal"
                 placeholder="0"
                 value={received}
                 onChange={(event) => setReceived(event.target.value)}
-                error={receivedCents === null ? 'Use a number like 20000.' : undefined}
+                error={receivedCents === null ? t('errors.numberLike', { example: '20000' }) : undefined}
               />
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -309,10 +315,10 @@ export function PosPage() {
                   disabled={lines.length === 0}
                   onClick={() => setReceived(fromCents(totals.total))}
                 >
-                  Exact cash
+                  {t('pos.exactCash')}
                 </Button>
                 <Button type="button" variant="outline" size="sm" disabled={lines.length === 0} onClick={() => setReceived('0')}>
-                  All on credit
+                  {t('pos.allOnCredit')}
                 </Button>
               </div>
               {lines.length > 0 && receivedCents !== null && (
@@ -321,24 +327,24 @@ export function PosPage() {
                   aria-live="polite"
                 >
                   {cash.balance > 0
-                    ? `${formatTZS(fromCents(cash.balance))} will be owed on credit.`
+                    ? t('pos.willBeOwed', { amount: formatTZS(fromCents(cash.balance)) })
                     : cash.change > 0
-                      ? `Change to give: ${formatTZS(fromCents(cash.change))}`
-                      : 'Paid in full.'}
+                      ? t('pos.changeToGive', { amount: formatTZS(fromCents(cash.change)) })
+                      : t('pos.paidInFull')}
                 </p>
               )}
             </div>
 
             <CustomerPicker value={customer} onChange={setCustomer} required={cash.balance > 0 && lines.length > 0} />
 
-            <FormField label="Note (optional)" value={note} onChange={(event) => setNote(event.target.value)} maxLength={255} />
+            <FormField label={t('common.noteOptional')} value={note} onChange={(event) => setNote(event.target.value)} maxLength={255} />
 
             <FormError message={error ?? undefined} />
             {needsCustomer && (
-              <p className="text-destructive text-sm">Choose or add the customer who owes the balance.</p>
+              <p className="text-destructive text-sm">{t('pos.needCustomer')}</p>
             )}
             <Button size="lg" onClick={submit} disabled={blocked}>
-              {submitting ? 'Saving…' : `Complete sale · ${formatTZS(fromCents(totals.total))}`}
+              {submitting ? t('common.saving') : t('pos.complete', { total: formatTZS(fromCents(totals.total)) })}
             </Button>
           </CardContent>
         </Card>
@@ -357,6 +363,7 @@ function CustomerPicker({
   onChange: (value: CustomerChoice) => void
   required: boolean
 }) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const customers = useQuery({
     queryKey: ['customers', 'pick', search],
@@ -367,7 +374,7 @@ function CustomerPicker({
   if (value.mode === 'existing') {
     return (
       <div className="grid gap-1.5">
-        <p className="text-sm font-medium">Customer</p>
+        <p className="text-sm font-medium">{t('pos.customer')}</p>
         <div className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
           <span className="flex min-w-0 items-center gap-2">
             <UserIcon className="size-4 shrink-0" />
@@ -376,12 +383,14 @@ function CustomerPicker({
               {value.customer.phone && ` · ${value.customer.phone}`}
             </span>
           </span>
-          <Button variant="ghost" size="icon" aria-label="Remove customer" onClick={() => onChange({ mode: 'none' })}>
+          <Button variant="ghost" size="icon" aria-label={t('pos.removeCustomer')} onClick={() => onChange({ mode: 'none' })}>
             <XIcon />
           </Button>
         </div>
         {(toCents(value.customer.balance) ?? 0) > 0 && (
-          <p className="text-muted-foreground text-sm">Already owes {formatTZS(value.customer.balance)}.</p>
+          <p className="text-muted-foreground text-sm">
+            {t('pos.alreadyOwes', { amount: formatTZS(value.customer.balance) })}
+          </p>
         )}
       </div>
     )
@@ -391,23 +400,23 @@ function CustomerPicker({
     return (
       <div className="grid gap-3 rounded-md border p-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">New customer</p>
+          <p className="text-sm font-medium">{t('pos.newCustomer')}</p>
           <Button variant="ghost" size="sm" onClick={() => onChange({ mode: 'none' })}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
         <FormField
-          label="Name"
+          label={t('common.name')}
           value={value.name}
           onChange={(event) => onChange({ ...value, name: event.target.value })}
-          error={required && !value.name.trim() ? 'Enter the customer’s name.' : undefined}
+          error={required && !value.name.trim() ? t('pos.enterCustomerName') : undefined}
         />
         <FormField
-          label="Phone"
+          label={t('common.phone')}
           inputMode="tel"
           value={value.phone}
           onChange={(event) => onChange({ ...value, phone: event.target.value })}
-          hint="Helps you reach them about what they owe."
+          hint={t('pos.phoneHint')}
         />
       </div>
     )
@@ -416,11 +425,12 @@ function CustomerPicker({
   return (
     <div className="grid gap-2">
       <p className="text-sm font-medium">
-        Customer {required ? <span className="text-destructive">(required for credit)</span> : '(optional)'}
+        {t('pos.customer')}{' '}
+        {required ? <span className="text-destructive">{t('pos.customerRequired')}</span> : t('pos.customerOptional')}
       </p>
-      <SearchInput value={search} onChange={setSearch} placeholder="Find customer by name or phone" />
+      <SearchInput value={search} onChange={setSearch} placeholder={t('pos.findCustomer')} />
       {search.trim() !== '' && (
-        <ul className="grid gap-1" aria-label="Matching customers">
+        <ul className="grid gap-1" aria-label={t('pos.matchingCustomers')}>
           {customers.data?.results.map((c) => (
             <li key={c.id}>
               <button
@@ -433,7 +443,7 @@ function CustomerPicker({
               </button>
             </li>
           ))}
-          {customers.data?.count === 0 && <li className="text-muted-foreground px-2 text-sm">No match.</li>}
+          {customers.data?.count === 0 && <li className="text-muted-foreground px-2 text-sm">{t('pos.noMatch')}</li>}
         </ul>
       )}
       <Button
@@ -444,7 +454,7 @@ function CustomerPicker({
         onClick={() => onChange({ mode: 'new', name: search.trim(), phone: '' })}
       >
         <PlusIcon />
-        New customer
+        {t('pos.newCustomer')}
       </Button>
     </div>
   )

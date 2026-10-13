@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { DataList, PAGE_SIZE } from '@/components/data-list'
 import type { Column } from '@/components/data-list'
@@ -33,14 +34,14 @@ import { PERMISSIONS } from '@/lib/types'
 import type { Customer, Paginated } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
 
-const BALANCE_FILTERS = [
-  { id: 'true', name: 'Owes money' },
-  { id: 'false', name: 'Owes nothing' },
-]
-
 /** Customers and what each still owes on credit sales. */
 export function CustomersPage() {
   const { can } = useAuth()
+  const { t } = useTranslation()
+  const BALANCE_FILTERS = [
+    { id: 'true', name: t('customers.owesMoney') },
+    { id: 'false', name: t('customers.owesNothing') },
+  ]
   const navigate = useNavigate()
   const list = useListParams()
   const [adding, setAdding] = useState(false)
@@ -64,18 +65,18 @@ export function CustomersPage() {
   const addButton = can(PERMISSIONS.salesCreate) && (
     <Button size="lg" onClick={() => setAdding(true)}>
       <PlusIcon />
-      Add customer
+      {t('customers.add')}
     </Button>
   )
   const salesOf = (c: Customer) => `/sales?customer=${c.id}`
 
   const columns: Column<Customer>[] = [
-    { header: 'Name', cell: (c) => <span className="font-medium">{c.name}</span> },
-    { header: 'Phone', cell: (c) => c.phone || '—' },
-    { header: 'Bought', cell: (c) => formatTZS(c.total_bought), className: 'text-right tabular-nums' },
-    { header: 'Paid', cell: (c) => formatTZS(c.amount_paid), className: 'text-right tabular-nums' },
+    { header: t('common.name'), cell: (c) => <span className="font-medium">{c.name}</span> },
+    { header: t('common.phone'), cell: (c) => c.phone || '—' },
+    { header: t('customers.bought'), cell: (c) => formatTZS(c.total_bought), className: 'text-right tabular-nums' },
+    { header: t('customers.paid'), cell: (c) => formatTZS(c.amount_paid), className: 'text-right tabular-nums' },
     {
-      header: 'Owes',
+      header: t('customers.owes'),
       cell: (c) =>
         Number(c.balance) > 0 ? <span className="font-medium">{formatTZS(c.balance)}</span> : '—',
       className: 'text-right tabular-nums',
@@ -85,19 +86,19 @@ export function CustomersPage() {
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
       <PageHeader
-        title="Customers"
-        description="Who you sell to, and who still owes you money."
+        title={t('customers.title')}
+        description={t('customers.subtitle')}
         actions={addButton}
       />
 
       <div className="grid gap-3 sm:grid-cols-[1fr_14rem]">
-        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Search name or phone" />
-        <RefSelect hideLabel label="Balance" noneLabel="All customers" value={hasBalance}
+        <SearchInput value={list.search} onChange={list.setSearch} placeholder={t('customers.searchPlaceholder')} />
+        <RefSelect hideLabel label={t('customers.balance')} noneLabel={t('customers.allCustomers')} value={hasBalance}
           onChange={(v) => list.set('owes', v)} options={BALANCE_FILTERS} />
       </div>
 
       <DataList
-        label="customers"
+        label={t('customers.listLabel')}
         query={query}
         columns={columns}
         rowKey={(c) => c.id}
@@ -106,10 +107,10 @@ export function CustomersPage() {
         onPageChange={list.setPage}
         empty={
           list.search || hasBalance
-            ? { title: hasBalance === 'true' ? 'Nobody owes you money' : 'No customers match' }
+            ? { title: hasBalance === 'true' ? t('customers.nobodyOwes') : t('customers.noMatch') }
             : {
-                title: 'No customers yet',
-                description: 'Customers are added here or at the sale screen. A sale on credit needs one.',
+                title: t('customers.empty'),
+                description: t('customers.emptyText'),
                 action: addButton,
               }
         }
@@ -118,13 +119,13 @@ export function CustomersPage() {
             <Card className="flex-row items-center justify-between gap-3 p-3 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-medium">{c.name}</p>
-                <p className="text-muted-foreground">{c.phone || 'No phone'}</p>
+                <p className="text-muted-foreground">{c.phone || t('customers.noPhone')}</p>
               </div>
               <div className="text-right">
                 {Number(c.balance) > 0 ? (
-                  <p className="font-medium tabular-nums">Owes {formatTZS(c.balance)}</p>
+                  <p className="font-medium tabular-nums">{t('customers.owesAmount', { amount: formatTZS(c.balance) })}</p>
                 ) : (
-                  <p className="text-muted-foreground">Owes nothing</p>
+                  <p className="text-muted-foreground">{t('customers.owesNothing')}</p>
                 )}
               </div>
             </Card>
@@ -139,6 +140,7 @@ export function CustomersPage() {
 
 function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const empty: CustomerValues = { name: '', phone: '', notes: '' }
   const form = useForm<CustomerValues>({ resolver: zodResolver(customerSchema), defaultValues: empty })
   const { errors, isSubmitting } = form.formState
@@ -156,7 +158,7 @@ function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       return
     }
     await queryClient.invalidateQueries({ queryKey: ['customers'] })
-    toast.success('Customer added.')
+    toast.success(t('customers.added'))
     close(false)
   }
 
@@ -164,21 +166,21 @@ function CustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add customer</DialogTitle>
-          <DialogDescription>A phone number helps you follow up on what they owe.</DialogDescription>
+          <DialogTitle>{t('customers.add')}</DialogTitle>
+          <DialogDescription>{t('customers.addText')}</DialogDescription>
         </DialogHeader>
         <form id="customer-form" className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
           <FormError message={errors.root?.server?.message} />
-          <FormField label="Name" error={errors.name?.message} {...form.register('name')} />
-          <FormField label="Phone" inputMode="tel" error={errors.phone?.message} {...form.register('phone')} />
-          <FormField label="Notes" error={errors.notes?.message} {...form.register('notes')} />
+          <FormField label={t('common.name')} error={errors.name?.message} {...form.register('name')} />
+          <FormField label={t('common.phone')} inputMode="tel" error={errors.phone?.message} {...form.register('phone')} />
+          <FormField label={t('customers.notes')} error={errors.notes?.message} {...form.register('notes')} />
         </form>
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={() => close(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form="customer-form" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving…' : 'Add customer'}
+            {isSubmitting ? t('common.saving') : t('customers.add')}
           </Button>
         </DialogFooter>
       </DialogContent>

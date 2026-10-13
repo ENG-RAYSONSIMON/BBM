@@ -44,8 +44,26 @@ if the container is down). There is no local Python environment to rely on.
 - The sale flow (validate stock → sale + items → FEFO batch consumption via
   `record_movement` → COGS/profit from snapshots → payment) is one
   `transaction.atomic()` block; any failure rolls back everything.
+- Purchases: `purchases.services.save_draft()` never touches stock.
+  `receive_purchase()` locks the purchase and, in one atomic block, resolves
+  each line's batch (`resolve_batch`), writes a `PURCHASE` movement via
+  `record_movement`, and sets the product's `cost_price` to what was paid.
+  Only drafts can be edited or cancelled; a received purchase is corrected
+  with stock adjustments.
+- Net profit = gross profit (from sale snapshots) −
+  `expenses.services.expenses_total()` for the same period (see
+  `sales.services` summary).
 - Money is `DecimalField(max_digits=12, decimal_places=2)` and `Decimal` in
   Python. Never `float`. Currency is TZS; `TIME_ZONE` is `Africa/Dar_es_Salaam`.
+
+## Files
+- Validate uploads in the app's `validators.py` (type + a size limit read
+  from `.env`, e.g. `EXPENSE_RECEIPT_MAX_BYTES`). Pattern:
+  `catalog/validators.py`, `expenses/validators.py`.
+- Private files (expense receipts) use `expenses.models.PrivateStorage`
+  under `PRIVATE_MEDIA_ROOT`, in per-business folders. Never put them under
+  `MEDIA_ROOT` or `/media/`; serve them only through a permissioned,
+  tenant-scoped view (pattern: `expenses.views.ExpenseReceiptView`).
 
 ## Permissions (FR-5)
 - Every authenticated view declares `required_permissions` — a tuple, or a
@@ -55,7 +73,8 @@ if the container is down). There is no local Python environment to rely on.
 - New codename: add a constant + description to `accounts/rbac.py`
   (`PERMISSIONS` and `DEFAULT_ROLE_PERMISSIONS`) **and** a data migration in
   `accounts/` that seeds it and grants it to existing system roles, using
-  literal codenames (copy `0004_phase2_permissions.py`). Mirror it in
+  literal codenames (copy the latest,
+  `0006_phase3_purchases_expenses_permissions.py`). Mirror it in
   `frontend/src/lib/types.ts` `PERMISSIONS`.
 
 ## API conventions
@@ -67,6 +86,16 @@ if the container is down). There is no local Python environment to rely on.
 - Domain errors: 400 for validation, 404 for other tenants' rows (never 403),
   409 for in-use deletes, 403 for missing permission.
 - Put business logic in `services.py`, not in serializers or views.
+
+## Messages and languages
+- Every message a user can see (validation errors, `protected_message`,
+  `Conflict`, `detail`) goes through `gettext` (`_()`). Use `gettext_lazy`
+  for module-level and class attributes.
+- Use named placeholders, never f-strings:
+  `_("%(name)s: only %(count)s available to sell.") % {...}`.
+- After adding or changing one, run `makemessages -l sw` and fill in the
+  Kiswahili (simple, everyday words), then run `compilemessages`. See README
+  §7; `sales.tests.test_i18n` checks it.
 
 ## Tests
 - Tests use Django's `APITestCase` (not pytest). Shared fixtures live in

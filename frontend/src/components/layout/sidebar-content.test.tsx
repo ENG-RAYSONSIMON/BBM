@@ -33,4 +33,13 @@ describe('SidebarContent', () => {
     expect(nav).toHaveTextContent('Customers')
     expect(nav).not.toHaveTextContent('New sale')
   })
+
+  it('shows purchases and expenses links with their permissions', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['purchases.view', 'expenses.view'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+
+    expect(nav).toHaveTextContent('Purchases')
+    expect(nav).toHaveTextContent('Expenses')
+    expect(nav).not.toHaveTextContent('Sales')
+  })
 })

@@ -3,6 +3,7 @@ import { ArchiveIcon, ArchiveRestoreIcon, ArrowLeftIcon, PencilIcon, ArrowUpDown
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { AdjustStockDialog } from '@/components/adjust-stock-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -19,18 +20,8 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { formatDate, formatDateTime, formatQuantity, formatTZS } from '@/lib/format'
 import { PERMISSIONS } from '@/lib/types'
-import type { Batch, MovementType, Paginated, Product, StockMovement } from '@/lib/types'
+import type { Batch, Paginated, Product, StockMovement } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
-
-const MOVEMENT_LABELS: Record<MovementType, string> = {
-  PURCHASE: 'Purchase',
-  SALE: 'Sale',
-  ADJUSTMENT: 'Adjustment',
-  DAMAGE: 'Damage',
-  EXPIRY: 'Expired',
-  TRANSFER: 'Transfer',
-  RETURN: 'Returned (sale voided)',
-}
 
 function daysUntil(date: string) {
   const [y, m, d] = date.split('-').map(Number)
@@ -42,6 +33,7 @@ function daysUntil(date: string) {
 export function ProductDetailPage() {
   const { id = '' } = useParams()
   const { can } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const list = useListParams()
@@ -69,13 +61,13 @@ export function ProductDetailPage() {
     onSuccess: (product) => {
       queryClient.setQueryData(['product', id], product)
       void queryClient.invalidateQueries({ queryKey: ['products'] })
-      toast.success(product.is_active ? 'Product restored.' : 'Product archived.')
+      toast.success(product.is_active ? t('products.restored') : t('products.archivedToast'))
     },
   })
 
   if (productQuery.isPending) {
     return (
-      <div className="mx-auto grid max-w-6xl gap-4" role="status" aria-label="Loading product">
+      <div className="mx-auto grid max-w-6xl gap-4" role="status" aria-label={t('products.loadingProduct')}>
         <Skeleton className="h-10 w-1/2" />
         <Skeleton className="h-48" />
         <Skeleton className="h-48" />
@@ -87,7 +79,7 @@ export function ProductDetailPage() {
       <div className="mx-auto grid max-w-6xl justify-items-start gap-3">
         <FormError message={productQuery.error.message} />
         <Button variant="outline" size="lg" asChild>
-          <Link to="/products">Back to products</Link>
+          <Link to="/products">{t('products.backToProducts')}</Link>
         </Button>
       </div>
     )
@@ -96,25 +88,25 @@ export function ProductDetailPage() {
   const product = productQuery.data
   const batches = batchesQuery.data?.results ?? []
   const facts: [string, string][] = [
-    ['Selling price', formatTZS(product.selling_price)],
-    ['Cost price', formatTZS(product.cost_price)],
-    ['SKU', product.sku || '—'],
-    ['Barcode', product.barcode || '—'],
-    ['Category', product.category_detail?.name ?? '—'],
-    ['Brand', product.brand_detail?.name ?? '—'],
-    ['Supplier', product.supplier_detail?.name ?? '—'],
+    [t('products.sellingPrice'), formatTZS(product.selling_price)],
+    [t('products.costPrice'), formatTZS(product.cost_price)],
+    [t('products.sku'), product.sku || '—'],
+    [t('products.barcode'), product.barcode || '—'],
+    [t('common.category'), product.category_detail?.name ?? '—'],
+    [t('common.brand'), product.brand_detail?.name ?? '—'],
+    [t('common.supplier'), product.supplier_detail?.name ?? '—'],
     [
-      'Low-stock alert at',
-      `${product.threshold} ${product.unit}${product.reorder_level === null ? ' (business default)' : ''}`,
+      t('products.lowStockAlertAt'),
+      `${product.threshold} ${product.unit}${product.reorder_level === null ? ` ${t('products.businessDefault')}` : ''}`,
     ],
   ]
 
   const movementColumns: Column<StockMovement>[] = [
-    { header: 'When', cell: (m) => formatDateTime(m.created_at) },
-    { header: 'Type', cell: (m) => MOVEMENT_LABELS[m.movement_type] },
-    { header: 'Batch', cell: (m) => m.batch_number },
+    { header: t('common.when'), cell: (m) => formatDateTime(m.created_at) },
+    { header: t('products.type'), cell: (m) => t(`movement.${m.movement_type}`) },
+    { header: t('common.batch'), cell: (m) => m.batch_number },
     {
-      header: 'Qty',
+      header: t('common.qty'),
       cell: (m) => (
         <span className={m.quantity < 0 ? 'text-destructive tabular-nums' : 'tabular-nums'}>
           {formatQuantity(m.quantity)}
@@ -122,8 +114,8 @@ export function ProductDetailPage() {
       ),
       className: 'text-right',
     },
-    { header: 'Note', cell: (m) => m.reason || '—' },
-    { header: 'By', cell: (m) => m.created_by_name },
+    { header: t('common.note'), cell: (m) => m.reason || '—' },
+    { header: t('common.by'), cell: (m) => m.created_by_name },
   ]
 
   return (
@@ -131,7 +123,7 @@ export function ProductDetailPage() {
       <Button variant="ghost" size="sm" className="justify-self-start" asChild>
         <Link to="/products">
           <ArrowLeftIcon />
-          Products
+          {t('products.title')}
         </Link>
       </Button>
 
@@ -145,7 +137,7 @@ export function ProductDetailPage() {
                 {product.stock_on_hand} {product.unit}
               </span>
               <StockBadge status={product.stock_status} />
-              {!product.is_active && <Badge variant="outline">Archived</Badge>}
+              {!product.is_active && <Badge variant="outline">{t('products.archived')}</Badge>}
             </div>
           </div>
         </div>
@@ -153,7 +145,7 @@ export function ProductDetailPage() {
           {can(PERMISSIONS.inventoryAdjust) && product.is_active && (
             <Button size="lg" onClick={() => setAdjusting(true)}>
               <ArrowUpDownIcon />
-              Adjust stock
+              {t('products.adjustStock')}
             </Button>
           )}
           {can(PERMISSIONS.catalogManage) && (
@@ -161,18 +153,18 @@ export function ProductDetailPage() {
               <Button variant="outline" size="lg" asChild>
                 <Link to={`/products/${product.id}/edit`}>
                   <PencilIcon />
-                  Edit
+                  {t('common.edit')}
                 </Link>
               </Button>
               {product.is_active ? (
                 <Button variant="outline" size="lg" onClick={() => setConfirm('archive')}>
                   <ArchiveIcon />
-                  Archive
+                  {t('products.archive')}
                 </Button>
               ) : (
                 <Button variant="outline" size="lg" onClick={() => setActive.mutate(true)} disabled={setActive.isPending}>
                   <ArchiveRestoreIcon />
-                  Restore
+                  {t('products.restore')}
                 </Button>
               )}
             </>
@@ -180,7 +172,7 @@ export function ProductDetailPage() {
           {can(PERMISSIONS.catalogDelete) && (
             <Button variant="destructive" size="lg" onClick={() => setConfirm('delete')}>
               <Trash2Icon />
-              Delete
+              {t('common.delete')}
             </Button>
           )}
         </div>
@@ -189,7 +181,7 @@ export function ProductDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Details</CardTitle>
+            <CardTitle>{t('products.details')}</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_1fr]">
@@ -207,7 +199,7 @@ export function ProductDetailPage() {
         {canSeeStock && (
           <Card>
             <CardHeader>
-              <CardTitle>Batches</CardTitle>
+              <CardTitle>{t('products.batches')}</CardTitle>
             </CardHeader>
             <CardContent>
               {batchesQuery.isPending ? (
@@ -216,8 +208,8 @@ export function ProductDetailPage() {
                 <FormError message={batchesQuery.error.message} />
               ) : batches.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  No stock recorded yet.
-                  {can(PERMISSIONS.inventoryAdjust) && product.is_active && ' Use “Adjust stock” to add opening stock.'}
+                  {t('products.noStockYet')}
+                  {can(PERMISSIONS.inventoryAdjust) && product.is_active && t('products.useAdjust')}
                 </p>
               ) : (
                 <ul className="divide-y">
@@ -226,7 +218,7 @@ export function ProductDetailPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{batch.batch_number}</p>
                         <p className="text-muted-foreground">
-                          {batch.expiry_date ? `Expires ${formatDate(batch.expiry_date)}` : 'No expiry'}
+                          {batch.expiry_date ? t('products.expires', { date: formatDate(batch.expiry_date) }) : t('products.noExpiry')}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -249,20 +241,20 @@ export function ProductDetailPage() {
       {canSeeStock && (
         <section className="grid gap-3" aria-labelledby="history-heading">
           <h2 id="history-heading" className="text-lg font-semibold">
-            Stock history
+            {t('products.history')}
           </h2>
           <DataList
-            label="stock history"
+            label={t('products.historyLabel')}
             query={movementsQuery}
             columns={movementColumns}
             rowKey={(m) => m.id}
             page={list.page}
             onPageChange={list.setPage}
-            empty={{ title: 'No stock movements yet' }}
+            empty={{ title: t('products.noMovements') }}
             card={(m) => (
               <Card className="gap-1 p-3 text-sm">
                 <div className="flex justify-between gap-2">
-                  <span className="font-medium">{MOVEMENT_LABELS[m.movement_type]}</span>
+                  <span className="font-medium">{t(`movement.${m.movement_type}`)}</span>
                   <span className={m.quantity < 0 ? 'text-destructive tabular-nums' : 'tabular-nums'}>
                     {formatQuantity(m.quantity)}
                   </span>
@@ -281,22 +273,22 @@ export function ProductDetailPage() {
       <ConfirmDialog
         open={confirm === 'archive'}
         onOpenChange={(open) => !open && setConfirm(null)}
-        title="Archive this product?"
-        description="It disappears from lists and alerts but keeps its history. You can restore it later."
-        confirmLabel="Archive"
+        title={t('products.archiveTitle')}
+        description={t('products.archiveText')}
+        confirmLabel={t('products.archive')}
         onConfirm={() => setActive.mutateAsync(false)}
       />
       <ConfirmDialog
         open={confirm === 'delete'}
         onOpenChange={(open) => !open && setConfirm(null)}
-        title="Delete this product?"
-        description="This can't be undone. Products with stock history can only be archived."
-        confirmLabel="Delete"
+        title={t('products.deleteTitle')}
+        description={t('products.deleteText')}
+        confirmLabel={t('common.delete')}
         destructive
         onConfirm={async () => {
           await api(`/products/${product.id}/`, { method: 'DELETE' })
           await queryClient.invalidateQueries({ queryKey: ['products'] })
-          toast.success('Product deleted.')
+          toast.success(t('products.deleted'))
           navigate('/products', { replace: true })
         }}
       />

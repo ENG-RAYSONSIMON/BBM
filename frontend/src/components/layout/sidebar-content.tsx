@@ -7,12 +7,16 @@ import {
   SettingsIcon,
   ShoppingCartIcon,
   TagsIcon,
+  TruckIcon,
   UsersIcon,
+  WalletIcon,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink, useNavigate } from 'react-router'
 
 import { Brand } from './brand'
+import { LanguageToggle } from '@/components/language-toggle'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
@@ -21,22 +25,28 @@ import { cn } from '@/lib/utils'
 
 type NavItem = {
   to: string
-  label: string
+  label: NavLabel
   icon: ComponentType<{ className?: string }>
   /** Shown only to roles holding this permission. */
   permission?: string
 }
 
-// Only features that exist get a link; purchases and expenses come next.
+type NavLabel =
+  | 'dashboard' | 'newSale' | 'sales' | 'customers' | 'purchases' | 'expenses'
+  | 'products' | 'inventory' | 'catalog' | 'settings'
+
+// Only features that exist get a link. Labels are keys under `nav`.
 const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
-  { to: '/pos', label: 'New sale', icon: ShoppingCartIcon, permission: PERMISSIONS.salesCreate },
-  { to: '/sales', label: 'Sales', icon: ReceiptIcon, permission: PERMISSIONS.salesView },
-  { to: '/customers', label: 'Customers', icon: UsersIcon, permission: PERMISSIONS.salesView },
-  { to: '/products', label: 'Products', icon: PackageIcon, permission: PERMISSIONS.catalogView },
-  { to: '/inventory', label: 'Inventory alerts', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
-  { to: '/catalog', label: 'Catalog setup', icon: TagsIcon, permission: PERMISSIONS.catalogView },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon, permission: PERMISSIONS.settingsView },
+  { to: '/', label: 'dashboard', icon: LayoutDashboardIcon },
+  { to: '/pos', label: 'newSale', icon: ShoppingCartIcon, permission: PERMISSIONS.salesCreate },
+  { to: '/sales', label: 'sales', icon: ReceiptIcon, permission: PERMISSIONS.salesView },
+  { to: '/customers', label: 'customers', icon: UsersIcon, permission: PERMISSIONS.salesView },
+  { to: '/purchases', label: 'purchases', icon: TruckIcon, permission: PERMISSIONS.purchasesView },
+  { to: '/expenses', label: 'expenses', icon: WalletIcon, permission: PERMISSIONS.expensesView },
+  { to: '/products', label: 'products', icon: PackageIcon, permission: PERMISSIONS.catalogView },
+  { to: '/inventory', label: 'inventory', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
+  { to: '/catalog', label: 'catalog', icon: TagsIcon, permission: PERMISSIONS.catalogView },
+  { to: '/settings', label: 'settings', icon: SettingsIcon, permission: PERMISSIONS.settingsView },
 ]
 
 /**
@@ -45,6 +55,7 @@ const NAV: NavItem[] = [
  */
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { me, logout, can } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -61,7 +72,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex h-14 items-center border-b px-4">
         <Brand />
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Main">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label={t('nav.main')}>
         {NAV.filter((item) => !item.permission || can(item.permission)).map((item) => (
           <NavLink
             key={item.to}
@@ -78,7 +89,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             }
           >
             <item.icon className="size-4" />
-            {item.label}
+            {t(`nav.${item.label}`)}
           </NavLink>
         ))}
       </nav>
@@ -90,11 +101,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {displayName} · {me?.role}
             </p>
           </div>
+          <LanguageToggle />
           <ThemeToggle />
         </div>
         <Button variant="ghost" size="lg" className="w-full justify-start" onClick={handleLogout}>
           <LogOutIcon />
-          Log out
+          {t('nav.logout')}
         </Button>
       </div>
     </div>

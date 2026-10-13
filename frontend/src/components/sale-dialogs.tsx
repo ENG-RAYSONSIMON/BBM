@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -42,6 +43,7 @@ export function RecordPaymentDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const empty: PaymentValues = { amount_received: '', note: '' }
   const form = useForm<PaymentValues>({ resolver: zodResolver(paymentSchema), defaultValues: empty })
   const { errors, isSubmitting } = form.formState
@@ -62,7 +64,7 @@ export function RecordPaymentDialog({
       return
     }
     await invalidateSales(queryClient, sale.id)
-    toast.success('Payment recorded.')
+    toast.success(t('sales.paymentRecorded'))
     close(false)
   }
 
@@ -70,17 +72,20 @@ export function RecordPaymentDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Record payment</DialogTitle>
+          <DialogTitle>{t('sales.paymentTitle')}</DialogTitle>
           <DialogDescription>
-            {sale.receipt_number}
-            {sale.customer_name ? ` · ${sale.customer_name}` : ''} · {formatTZS(sale.balance)} still owed
+            {t('sales.paymentSubtitle', {
+              receipt: sale.receipt_number,
+              customer: sale.customer_name ? ` · ${sale.customer_name}` : '',
+              amount: formatTZS(sale.balance),
+            })}
           </DialogDescription>
         </DialogHeader>
         <form id="record-payment" className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
           <FormError message={errors.root?.server?.message} />
           <div className="grid gap-2">
             <FormField
-              label="Cash received"
+              label={t('pos.cashReceived')}
               inputMode="decimal"
               autoFocus
               error={errors.amount_received?.message}
@@ -93,26 +98,26 @@ export function RecordPaymentDialog({
               className="justify-self-start"
               onClick={() => form.setValue('amount_received', fromCents(balance), { shouldValidate: true })}
             >
-              Pay the full balance
+              {t('sales.payFull')}
             </Button>
           </div>
           {result && (
             <p className="text-sm" aria-live="polite">
               {result.change > 0
-                ? `Give back ${formatTZS(fromCents(result.change))} change. The sale will be fully paid.`
+                ? t('sales.giveBack', { amount: formatTZS(fromCents(result.change)) })
                 : result.balance > 0
-                  ? `${formatTZS(fromCents(result.balance))} will still be owed.`
-                  : 'The sale will be fully paid.'}
+                  ? t('sales.stillOwedAfter', { amount: formatTZS(fromCents(result.balance)) })
+                  : t('sales.fullyPaid')}
             </p>
           )}
-          <FormField label="Note (optional)" error={errors.note?.message} {...form.register('note')} />
+          <FormField label={t('common.noteOptional')} error={errors.note?.message} {...form.register('note')} />
         </form>
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={() => close(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form="record-payment" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving…' : 'Record payment'}
+            {isSubmitting ? t('common.saving') : t('sales.recordPayment')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -131,6 +136,7 @@ export function VoidSaleDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const form = useForm<VoidValues>({ resolver: zodResolver(voidSchema), defaultValues: { reason: '' } })
   const { errors, isSubmitting } = form.formState
   const paid = (toCents(sale.amount_paid) ?? 0) > 0
@@ -157,7 +163,7 @@ export function VoidSaleDialog({
       queryClient.invalidateQueries({ queryKey: ['movements'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory'] }),
     ])
-    toast.success(`${sale.receipt_number} voided.`)
+    toast.success(t('sales.voided', { receipt: sale.receipt_number }))
     close(false)
   }
 
@@ -165,28 +171,28 @@ export function VoidSaleDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Void {sale.receipt_number}?</DialogTitle>
+          <DialogTitle>{t('sales.voidTitle', { receipt: sale.receipt_number })}</DialogTitle>
           <DialogDescription>
-            The items go back into stock
-            {paid ? ` and ${formatTZS(sale.amount_paid)} is recorded as refunded to the customer` : ''}. The
-            sale stays on record as void. This can't be undone.
+            {t('sales.voidText', {
+              refund: paid ? t('sales.voidRefund', { amount: formatTZS(sale.amount_paid) }) : '',
+            })}
           </DialogDescription>
         </DialogHeader>
         <form id="void-sale" className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
           <FormError message={errors.root?.server?.message} />
           <FormField
-            label="Reason"
-            placeholder="e.g. Customer returned the items"
+            label={t('common.reason')}
+            placeholder={t('sales.voidPlaceholder')}
             error={errors.reason?.message}
             {...form.register('reason')}
           />
         </form>
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={() => close(false)} disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form="void-sale" variant="destructive" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? 'Voiding…' : 'Void sale'}
+            {isSubmitting ? t('sales.voiding') : t('sales.voidSale')}
           </Button>
         </DialogFooter>
       </DialogContent>

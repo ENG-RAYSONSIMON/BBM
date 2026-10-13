@@ -3,6 +3,7 @@ import { MailCheckIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
@@ -13,13 +14,17 @@ import { applyServerErrors } from '@/lib/forms'
 import { forgotPasswordSchema } from '@/lib/schemas'
 import type { ForgotPasswordValues } from '@/lib/schemas'
 
-const backToLogin = (
-  <Link to="/login" className="text-foreground font-medium underline-offset-4 hover:underline">
-    Back to log in
-  </Link>
-)
+function BackToLogin() {
+  const { t } = useTranslation()
+  return (
+    <Link to="/login" className="text-foreground font-medium underline-offset-4 hover:underline">
+      {t('auth.backToLogin')}
+    </Link>
+  )
+}
 
 export function ForgotPasswordPage() {
+  const { t } = useTranslation()
   // The server answers the same way whether or not the account exists.
   const [sentMessage, setSentMessage] = useState<string | null>(null)
 
@@ -44,7 +49,7 @@ export function ForgotPasswordPage() {
 
   if (sentMessage) {
     return (
-      <AuthLayout title="Check your email" footer={backToLogin}>
+      <AuthLayout title={t('auth.checkEmail')} footer={<BackToLogin />}>
         <div className="flex gap-3">
           <MailCheckIcon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
           <p className="text-sm">{sentMessage}</p>
@@ -55,21 +60,21 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title="Reset your password"
-      description="Enter your account email and we'll send you a reset link."
-      footer={backToLogin}
+      title={t('auth.forgotTitle')}
+      description={t('auth.forgotText')}
+      footer={<BackToLogin />}
     >
       <form className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         <FormError message={errors.root?.server?.message} />
         <FormField
-          label="Email"
+          label={t('common.email')}
           type="email"
           autoComplete="email"
           error={errors.email?.message}
           {...form.register('email')}
         />
         <Button type="submit" size="lg" disabled={isSubmitting}>
-          {isSubmitting ? 'Sending…' : 'Send reset link'}
+          {isSubmitting ? t('auth.sending') : t('auth.sendLink')}
         </Button>
       </form>
     </AuthLayout>

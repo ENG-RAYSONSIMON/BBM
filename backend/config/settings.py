@@ -36,12 +36,16 @@ INSTALLED_APPS = [
     "catalog",
     "inventory",
     "sales",
+    "purchases",
+    "expenses",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Picks the language from Accept-Language (the frontend sends en or sw).
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -161,7 +165,14 @@ SPECTACULAR_SETTINGS = {
         {"name": "settings", "description": "Per-business configuration."},
         {"name": "catalog", "description": "Products, categories, brands and suppliers."},
         {"name": "inventory", "description": "Batches, the stock ledger and stock alerts."},
+        {"name": "purchases", "description": "Purchases from suppliers; receiving puts stock on the shelf."},
+        {"name": "expenses", "description": "Operating expenses, categories and receipts."},
     ],
+    # Sale and Purchase both have a `status` field with different choices.
+    "ENUM_NAME_OVERRIDES": {
+        "SaleStatusEnum": "sales.models.Sale.Status",
+        "PurchaseStatusEnum": "purchases.models.Purchase.Status",
+    },
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
 
@@ -170,6 +181,10 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
+# User-facing messages are translated to Kiswahili (locale/sw); requests
+# without an Accept-Language header stay in English.
+LANGUAGES = [("en", "English"), ("sw", "Kiswahili")]
+LOCALE_PATHS = [BASE_DIR / "locale"]
 # Tanzania (EAT). Datetimes are stored in UTC; this sets what "today" means,
 # e.g. for expiry windows.
 TIME_ZONE = "Africa/Dar_es_Salaam"
@@ -182,7 +197,11 @@ STATIC_URL = "static/"
 # serves them only when DEBUG. Production moves to object storage via STORAGES.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Files that must never be served at MEDIA_URL (expense receipts): only the
+# API reads them, after a tenant and permission check.
+PRIVATE_MEDIA_ROOT = env.path("PRIVATE_MEDIA_ROOT", default=BASE_DIR / "private_media")
 PRODUCT_IMAGE_MAX_BYTES = env.int("PRODUCT_IMAGE_MAX_BYTES", default=2 * 1024 * 1024)
+EXPENSE_RECEIPT_MAX_BYTES = env.int("EXPENSE_RECEIPT_MAX_BYTES", default=5 * 1024 * 1024)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -1,5 +1,6 @@
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -13,31 +14,32 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 const OPTIONS = [
-  { value: 'light', label: 'Light', icon: SunIcon },
-  { value: 'dark', label: 'Dark', icon: MoonIcon },
-  { value: 'system', label: 'System', icon: MonitorIcon },
+  { value: 'light', icon: SunIcon },
+  { value: 'dark', icon: MoonIcon },
+  { value: 'system', icon: MonitorIcon },
 ] as const
 
 /** Light / dark / system picker. The choice is saved by next-themes. */
 export function ThemeToggle({ align = 'end' }: { align?: 'start' | 'end' }) {
   const { theme, setTheme } = useTheme()
+  const { t } = useTranslation()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-lg" aria-label="Change theme">
+        <Button variant="ghost" size="icon-lg" aria-label={t('theme.change')}>
           <SunIcon className="dark:hidden" />
           <MoonIcon className="hidden dark:block" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-36">
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('theme.label')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup value={theme ?? 'system'} onValueChange={setTheme}>
           {OPTIONS.map((option) => (
             <DropdownMenuRadioItem key={option.value} value={option.value}>
               <option.icon />
-              {option.label}
+              {t(`theme.${option.value}`)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

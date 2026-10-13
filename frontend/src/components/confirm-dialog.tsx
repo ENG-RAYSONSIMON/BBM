@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ export function ConfirmDialog({
   destructive?: boolean
   onConfirm: () => Promise<unknown>
 }) {
+  const { t } = useTranslation()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,7 +42,7 @@ export function ConfirmDialog({
       await onConfirm()
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setError(err instanceof Error ? err.message : t('common.somethingWrong'))
     } finally {
       setPending(false)
     }
@@ -62,10 +64,10 @@ export function ConfirmDialog({
         <FormError message={error ?? undefined} />
         <DialogFooter>
           <Button variant="outline" size="lg" onClick={() => onOpenChange(false)} disabled={pending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant={destructive ? 'destructive' : 'default'} size="lg" onClick={confirm} disabled={pending}>
-            {pending ? 'Working…' : confirmLabel}
+            {pending ? t('common.working') : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

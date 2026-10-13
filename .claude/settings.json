@@ -12,6 +12,10 @@
       "Bash(npm run lint:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run build:*)",
+      "Bash(docker compose exec frontend npm test:*)",
+      "Bash(docker compose exec frontend npm run lint:*)",
+      "Bash(docker compose exec frontend npm run typecheck:*)",
+      "Bash(docker compose exec frontend npm run build:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
