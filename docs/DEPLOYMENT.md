@@ -52,16 +52,19 @@ branch. Backend checks gate publishing; frontend checks run
 before its image build. Images are:
 
 ```text
-ghcr.io/eng-raysonsimon/bbm-backend:<full-commit-sha>
-ghcr.io/eng-raysonsimon/bbm-frontend:<full-commit-sha>
+ghcr.io/mlindaamanimwendwa-ictpack/bbm-backend:<full-commit-sha>
+ghcr.io/mlindaamanimwendwa-ictpack/bbm-frontend:<full-commit-sha>
 ```
 
 Use both images from the same successful run. The workflow summary records
 digest references; prefer `image@sha256:...` in production. SHA tags identify a
 commit but can be overwritten by rerunning a build; digests pin exact content.
 Base image tags receive updates, so rebuild deliberately and redeploy by digest.
-No automatic VPS deployment or `latest` tag is used. Image publishing runs on
-pushes to `development` and through manual dispatch. GitHub package visibility is
+The examples use the writable fork `mlindaamanimwendwa-ictpack/BBM`; the workflow
+derives image names from whichever repository runs it. No `latest` tag is used.
+Image publishing runs on pushes to `development` and through manual dispatch.
+VPS deployment is disabled until explicitly enabled as described below.
+GitHub package visibility is
 configured separately; keep packages private unless you intentionally change it.
 Pin third-party action/base-image digests under your dependency-update policy.
 
@@ -69,14 +72,116 @@ The frontend build embeds `https://bbmapi.mauzo.tz/api/v1`. Runtime environment
 variables cannot change that URL; changing domains also requires updating nginx
 hosts, Compose labels and Django origins, then rebuilding.
 
+## Enable GitHub Actions deployment
+
+In **mlindaamanimwendwa-ictpack/BBM**, create an environment named `staging`
+under Settings > Environments. Restrict deployment branches to `development`.
+Configure required reviewers before enabling deployment, if supported by your
+GitHub plan. Declaring an environment in YAML does not create an approval rule.
+If required reviewers are unavailable, leave deployment disabled until you are
+comfortable with every successful `development` push deploying automatically.
+
+Set these **environment variables** (not secrets):
+
+| Name | Value |
+|---|---|
+| `VPS_HOST` | VPS IPv4 address or SSH DNS hostname |
+| `VPS_PORT` | SSH port, usually `22` |
+| `VPS_USER` | Dedicated deployment user |
+| `GHCR_USERNAME` | `mlindaamanimwendwa-ictpack` |
+
+Set these **environment secrets**:
+
+| Name | Value |
+|---|---|
+| `VPS_SSH_PRIVATE_KEY` | Dedicated, noninteractive SSH private key |
+| `VPS_KNOWN_HOSTS` | Verified SSH known_hosts entry for the VPS |
+| `GHCR_READ_TOKEN` | Token with `read:packages` access to both images |
+| `PRODUCTION_ENV` | Completed multiline `deploy/.env.example`, without `BACKEND_IMAGE` or `FRONTEND_IMAGE` |
+
+The workflow also accepts `VPS_HOST`, `VPS_PORT`, `VPS_USER` and `GHCR_USERNAME`
+as environment secrets instead of variables; secrets take precedence. Omitting
+`VPS_PORT` uses port 22. Thus seven secrets are sufficient when they are
+`VPS_HOST`, `VPS_USER`, `GHCR_USERNAME`, `VPS_SSH_PRIVATE_KEY`,
+`VPS_KNOWN_HOSTS`, `GHCR_READ_TOKEN` and `PRODUCTION_ENV`.
+The environment name `staging` does not isolate infrastructure: this job still
+targets `/opt/apps/bbm`, project `bbm`, and the configured public BBM domains.
+The repository enable switch retains its name `ENABLE_PRODUCTION_DEPLOY`.
+
+Use a unique Django key of at least 50 characters. Replace every `REPLACE_ME`,
+including SMTP credentials and sender. Supply one `NAME=value` assignment per
+line, without `export` or inline comments. Single-quote values containing `$`,
+`#` or spaces; for example `POSTGRES_PASSWORD='REPLACE_ME'` after filling in the
+real value. Do not use double-quoted or multiline values. Percent-encode the
+password in DATABASE_URL. Do not change database identifiers/password/URL during
+routine updates: initialized PostgreSQL users do not change when `.env` changes.
+The deploy script rejects such changes; plan credential rotation separately.
+
+The workflow injects both exact image digests from the successful publishing
+matrix. Never put real secrets in Git or Actions artifacts: only the public image
+references are uploaded as artifacts. The generated `.env` is mode 600, staged
+through SSH, and removed from the runner and remote staging directory afterwards.
+Application `.env` and pre-release backup copies persist securely on the VPS.
+An interrupted SSH transfer before the remote script starts can leave a staged
+`.env` in its mode-700 release directory; inspect and remove it during recovery.
+The backend still uses the production Compose file's forced settings module and
+volume locations.
+
+On the VPS, create `/opt/apps/bbm` owned by the deployment user, mode 750; install
+Docker with Compose v2+, Bash, util-linux (`flock`), and coreutils. Add the key's
+public half to that user's `authorized_keys`. Give the user Docker access and
+directory write permissions; **Docker access is effectively root access**.
+Confirm DNS and `dokploy-network` before enabling releases. No password prompts,
+interactive sudo or Docker login prompts may be required.
+
+Obtain the server's SSH host key through a trusted channel (for example the
+Contabo console) and verify its fingerprint independently before recording
+`VPS_KNOWN_HOSTS`. For a nonstandard SSH port, the entry uses
+`[hostname]:port`. Do not trust an unverified `ssh-keyscan` result in the workflow.
+IPv6 literals are not supported by the upload helper; use a DNS hostname instead.
+
+Finally, add the **repository variable** `ENABLE_PRODUCTION_DEPLOY=true` under
+Settings > Secrets and variables > Actions > Variables. It must be a repository
+variable, because the job condition is evaluated before environment variables
+are available. Leave it absent or `false` until all configuration and protection
+rules are ready. Missing secrets fail the job rather than falling back.
+
+Push the approved changes to `development`. After both images publish, the job
+waits for any configured production approval, uploads the production Compose as
+`/opt/apps/bbm/docker-compose.yml` plus `.env`, and runs the release. Deployments
+are serialized in GitHub and by a VPS file lock. Nothing changes shared Traefik
+configuration or deletes volumes.
+
+Images/configuration are validated and pulled before downtime. For an existing
+installation, nginx/backend stop while a PostgreSQL dump and both upload stores
+are backed up under `/opt/apps/bbm/backups/<release-id>/`, including the previous
+configuration. The job then installs the candidate configuration, starts db/redis,
+runs migrations and collectstatic, and waits for healthy services.
+
+This is **not zero-downtime**. If backup, migration, collection or readiness fails,
+the job fails explicitly and may leave nginx/backend stopped. It does not
+automatically roll back migrated data or restart an incompatible old image.
+Use the previous configuration/backups and the recovery guidance below to make
+an informed recovery. Partial first installs with existing volumes but missing
+configuration require manual recovery rather than silently adopting unknown data.
+For an existing manual install, first put its actual current Compose at
+`/opt/apps/bbm/docker-compose.yml` and preserve its `.env`.
+
+Database/upload backups here are a pre-release safeguard, not a complete backup
+service. Encrypt and copy them off-VPS, monitor failures and disk usage, and apply
+an explicit retention policy. No automatic deletion or retention job is included.
+Registry credentials are temporary for each deployment and removed afterwards.
+Creating the first admin user and verifying public TLS/SMTP remain manual tasks.
+
 ## Install server-side files
 
-Install only `compose.production.yml` and `deploy/.env.example` from the same
+For manual deployment (instead of the Actions job), install `compose.production.yml`
+as `docker-compose.yml` and `deploy/.env.example` as `.env.example` from the same
 reviewed release. A source checkout is unnecessary. On the VPS:
 
 ```bash
 sudo install -d -m 750 /opt/apps/bbm
-# Copy compose.production.yml and the example here using your normal transfer tool.
+# Copy the production Compose as docker-compose.yml and the example as .env.example.
 cd /opt/apps/bbm
 cp .env.example .env
 chmod 600 .env
@@ -107,14 +212,14 @@ Run from `/opt/apps/bbm`. Project name `bbm` fixes volume names; do not change i
 Do not print resolved Compose configuration containing secrets into shared logs.
 
 ```bash
-docker compose -f compose.production.yml config --quiet
-docker compose -f compose.production.yml pull
-docker compose -f compose.production.yml up -d --wait db redis
-docker compose -f compose.production.yml run --rm backend python manage.py check --deploy
-docker compose -f compose.production.yml run --rm backend python manage.py migrate --noinput
-docker compose -f compose.production.yml run --rm backend python manage.py collectstatic --noinput
-docker compose -f compose.production.yml up -d --wait
-docker compose -f compose.production.yml exec backend python manage.py createsuperuser
+docker compose config --quiet
+docker compose pull
+docker compose up -d --wait db redis
+docker compose run --rm backend python manage.py check --deploy
+docker compose run --rm backend python manage.py migrate --noinput
+docker compose run --rm backend python manage.py collectstatic --noinput
+docker compose up -d --wait
+docker compose exec backend python manage.py createsuperuser
 ```
 
 Security checks may warn about intentionally omitted HSTS subdomains/preload.
@@ -149,12 +254,12 @@ business records. A persistent volume on the same VPS is not a backup.
 During the maintenance window, stop all BBM writers:
 
 ```bash
-docker compose -f compose.production.yml stop nginx backend
+docker compose stop nginx backend
 umask 077
 mkdir -p backups
-docker compose -f compose.production.yml exec -T db \
+docker compose exec -T db \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backups/database.dump
-docker compose -f compose.production.yml run --rm --no-deps -T backend \
+docker compose run --rm --no-deps -T backend \
   tar -C /app -czf - media private_media > backups/uploads.tar.gz
 ```
 
@@ -169,14 +274,14 @@ For recovery to an **empty isolated deployment** with matching project/network
 configuration and images:
 
 ```bash
-docker compose -f compose.production.yml up -d --wait db redis
-docker compose -f compose.production.yml exec -T db \
+docker compose up -d --wait db redis
+docker compose exec -T db \
   sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --exit-on-error --no-owner' \
   < backups/database.dump
-docker compose -f compose.production.yml run --rm --no-deps -T backend \
+docker compose run --rm --no-deps -T backend \
   tar -C /app -xzf - < backups/uploads.tar.gz
-docker compose -f compose.production.yml run --rm backend python manage.py collectstatic --noinput
-docker compose -f compose.production.yml up -d --wait
+docker compose run --rm backend python manage.py collectstatic --noinput
+docker compose up -d --wait
 ```
 
 Restore only trusted archives. The tar archive preserves UID 10001 ownership;
@@ -188,8 +293,8 @@ Verify receipt authorization, row counts and images after restoration. Never use
 ## Checks before accepting a release
 
 ```bash
-docker compose -f compose.production.yml ps
-docker compose -f compose.production.yml logs --tail=100 backend nginx
+docker compose ps
+docker compose logs --tail=100 backend nginx
 curl -I http://bbm.mauzo.tz
 curl -I https://bbm.mauzo.tz
 curl -I https://bbmapi.mauzo.tz/admin/login/

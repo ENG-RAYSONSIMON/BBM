@@ -28,6 +28,10 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Test deployment tooling
+        run: |
+          python3 -m unittest discover -s deploy -p 'test_*.py'
+          bash -n deploy/deploy.sh deploy/upload.sh
       - run: docker build -t bbm-check backend
       - name: Backend checks
         run: |
@@ -81,3 +85,63 @@ jobs:
           IMAGE: ${{ steps.image.outputs.name }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: echo "\`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Save deployment image reference
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          mkdir -p image-reference
+          printf '%s@%s\n' "$IMAGE" "$DIGEST" > "image-reference/$COMPONENT.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.component }}
+          path: image-reference/*.txt
+          retention-days: 7
+
+  deploy:
+    needs: publish
+    # This switch is a repository variable; credentials belong to the environment.
+    if: github.ref == 'refs/heads/development' && vars.ENABLE_PRODUCTION_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: bbm-production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-*
+          path: image-reference
+          merge-multiple: true
+      - name: Test deployment tooling
+        run: |
+          python3 -m unittest discover -s deploy -p 'test_*.py'
+          bash -n deploy/deploy.sh deploy/upload.sh
+      - name: Prepare production files
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/bbm-release"
+          python3 deploy/render_env.py image-reference "$RUNNER_TEMP/bbm-release/.env"
+          cp compose.production.yml "$RUNNER_TEMP/bbm-release/docker-compose.yml"
+          cp deploy/deploy.sh "$RUNNER_TEMP/bbm-release/deploy.sh"
+      - name: Transfer and deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: bash deploy/upload.sh
+      - name: Remove runner credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/bbm-release/.env" "$RUNNER_TEMP/bbm-ssh-key" "$RUNNER_TEMP/bbm-known-hosts"
