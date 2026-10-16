@@ -46,8 +46,9 @@ need mode 755 and public files 644 so nginx can read them. Never use chmod 777.
 
 ## Publish images
 
-Push the reviewed commit, then manually run **Publish production images** in
-GitHub Actions on that ref. Backend checks gate publishing; frontend checks run
+Push the reviewed commit to `development` to run **Publish production images**,
+or run it manually in GitHub Actions once the workflow exists on the default
+branch. Backend checks gate publishing; frontend checks run
 before its image build. Images are:
 
 ```text
@@ -59,7 +60,8 @@ Use both images from the same successful run. The workflow summary records
 digest references; prefer `image@sha256:...` in production. SHA tags identify a
 commit but can be overwritten by rerunning a build; digests pin exact content.
 Base image tags receive updates, so rebuild deliberately and redeploy by digest.
-No automatic deployment or `latest` tag is used. GitHub package visibility is
+No automatic VPS deployment or `latest` tag is used. Image publishing runs on
+pushes to `development` and through manual dispatch. GitHub package visibility is
 configured separately; keep packages private unless you intentionally change it.
 Pin third-party action/base-image digests under your dependency-update policy.
 

@@ -2,6 +2,8 @@ name: Publish production images
 
 on:
   workflow_dispatch:
+  push:
+    branches: [development]
 
 permissions:
   contents: read
