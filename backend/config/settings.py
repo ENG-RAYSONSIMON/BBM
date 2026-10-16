@@ -191,12 +191,13 @@ TIME_ZONE = "Africa/Dar_es_Salaam"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = env.path("STATIC_ROOT", default=BASE_DIR / "staticfiles")
 
 # Uploaded files (product images). Not under any static/web root; Django
-# serves them only when DEBUG. Production moves to object storage via STORAGES.
+# serves them only when DEBUG. Production nginx reads the shared media volume.
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = env.path("MEDIA_ROOT", default=BASE_DIR / "media")
 # Files that must never be served at MEDIA_URL (expense receipts): only the
 # API reads them, after a tenant and permission check.
 PRIVATE_MEDIA_ROOT = env.path("PRIVATE_MEDIA_ROOT", default=BASE_DIR / "private_media")

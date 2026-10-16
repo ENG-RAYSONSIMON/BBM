@@ -33,7 +33,7 @@ urlpatterns = [
 # OpenAPI schema and docs UIs: development only, so production doesn't
 # advertise the API surface. `manage.py spectacular` works regardless.
 if settings.DEBUG:
-    # Uploaded media, dev only. Production serves it from object storage.
+    # Uploaded media, dev only. Production nginx serves the shared media volume.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += [
         path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

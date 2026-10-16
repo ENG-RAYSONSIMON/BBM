@@ -1,0 +1,81 @@
+name: Publish production images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15
+        env:
+          POSTGRES_DB: bbm
+          POSTGRES_USER: bbm
+          POSTGRES_PASSWORD: REPLACE_ME-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bbm"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t bbm-check backend
+      - name: Backend checks
+        run: |
+          docker run --rm --network host \
+            -e DJANGO_SECRET_KEY=REPLACE_ME-ci-only \
+            -e DATABASE_URL=postgres://bbm:REPLACE_ME-ci-only@localhost:5432/bbm \
+            bbm-check sh -c 'python manage.py check &&
+              python manage.py makemigrations --check --dry-run &&
+              python manage.py test &&
+              python manage.py spectacular --validate --fail-on-warn --file /tmp/schema.yml'
+  publish:
+    needs: backend-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frontend checks
+        if: matrix.component == 'frontend'
+        run: |
+          docker run --rm -v "$PWD/frontend:/app" -w /app node:24-alpine \
+            sh -c 'npm ci && npm test && npm run lint && npm run typecheck'
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          COMPONENT: ${{ matrix.component }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}-${COMPONENT}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: ./${{ matrix.component }}
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=https://bbmapi.mauzo.tz/api/v1
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Record immutable reference
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "\`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"

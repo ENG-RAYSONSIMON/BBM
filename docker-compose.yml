@@ -17,6 +17,8 @@ services:
 
   backend:
     build: ./backend
+    # Preserve development bind-mount writes; production uses the image's non-root user.
+    user: "0:0"
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
