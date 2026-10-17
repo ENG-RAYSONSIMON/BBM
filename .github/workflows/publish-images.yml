@@ -1,0 +1,147 @@
+name: Publish production images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [development]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15
+        env:
+          POSTGRES_DB: bbm
+          POSTGRES_USER: bbm
+          POSTGRES_PASSWORD: REPLACE_ME-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bbm"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deployment tooling
+        run: |
+          python3 -m unittest discover -s deploy -p 'test_*.py'
+          bash -n deploy/deploy.sh deploy/upload.sh
+      - run: docker build -t bbm-check backend
+      - name: Backend checks
+        run: |
+          docker run --rm --network host \
+            -e DJANGO_SECRET_KEY=REPLACE_ME-ci-only \
+            -e DATABASE_URL=postgres://bbm:REPLACE_ME-ci-only@localhost:5432/bbm \
+            bbm-check sh -c 'python manage.py check &&
+              python manage.py makemigrations --check --dry-run &&
+              python manage.py test &&
+              python manage.py spectacular --validate --fail-on-warn --file /tmp/schema.yml'
+  publish:
+    needs: backend-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frontend checks
+        if: matrix.component == 'frontend'
+        run: |
+          docker run --rm -v "$PWD/frontend:/app" -w /app node:24-alpine \
+            sh -c 'npm ci && npm test && npm run lint && npm run typecheck'
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          COMPONENT: ${{ matrix.component }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}-${COMPONENT}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: ./${{ matrix.component }}
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=https://bbmapi.mauzo.tz/api/v1
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Record immutable reference
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "\`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Save deployment image reference
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          mkdir -p image-reference
+          printf '%s@%s\n' "$IMAGE" "$DIGEST" > "image-reference/$COMPONENT.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.component }}
+          path: image-reference/*.txt
+          retention-days: 7
+
+  deploy:
+    needs: publish
+    # This switch is a repository variable; credentials belong to the environment.
+    if: github.ref == 'refs/heads/development' && vars.ENABLE_PRODUCTION_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: bbm-production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: image-*
+          path: image-reference
+          merge-multiple: true
+      - name: Test deployment tooling
+        run: |
+          python3 -m unittest discover -s deploy -p 'test_*.py'
+          bash -n deploy/deploy.sh deploy/upload.sh
+      - name: Prepare production files
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/bbm-release"
+          python3 deploy/render_env.py image-reference "$RUNNER_TEMP/bbm-release/.env"
+          cp compose.production.yml "$RUNNER_TEMP/bbm-release/docker-compose.yml"
+          cp deploy/deploy.sh "$RUNNER_TEMP/bbm-release/deploy.sh"
+      - name: Transfer and deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: bash deploy/upload.sh
+      - name: Remove runner credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/bbm-release/.env" "$RUNNER_TEMP/bbm-ssh-key" "$RUNNER_TEMP/bbm-known-hosts"

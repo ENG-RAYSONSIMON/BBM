@@ -1,0 +1,116 @@
+name: bbm
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [application]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # Throttle state may be discarded; Redis is not the system of record.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [application]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to a GHCR tag or digest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_production
+      STATIC_ROOT: /app/staticfiles
+      MEDIA_ROOT: /app/media
+      PRIVATE_MEDIA_ROOT: /app/private_media
+    volumes:
+      - staticfiles:/app/staticfiles
+      - media:/app/media
+      - private_media:/app/private_media
+    networks: [application]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, urllib.request; r = urllib.request.Request('http://127.0.0.1:8000/admin/login/', headers={'Host': os.environ['ALLOWED_HOSTS'].split(',')[0], 'X-Forwarded-Proto': 'https'}); urllib.request.urlopen(r, timeout=5)"
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging: *logging
+
+  nginx:
+    image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE to a GHCR tag or digest}
+    restart: unless-stopped
+    volumes:
+      - staticfiles:/srv/static:ro
+      - media:/srv/media:ro
+    networks: [application, proxy]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: dokploy-network
+      traefik.http.services.bbm.loadbalancer.server.port: "80"
+      traefik.http.routers.bbm-web.rule: Host(`bbm.mauzo.tz`)
+      traefik.http.routers.bbm-web.entrypoints: websecure
+      traefik.http.routers.bbm-web.tls.certresolver: letsencrypt
+      traefik.http.routers.bbm-web.service: bbm
+      traefik.http.routers.bbm-api.rule: Host(`bbmapi.mauzo.tz`)
+      traefik.http.routers.bbm-api.entrypoints: websecure
+      traefik.http.routers.bbm-api.tls.certresolver: letsencrypt
+      traefik.http.routers.bbm-api.service: bbm
+      traefik.http.routers.bbm-http.rule: Host(`bbm.mauzo.tz`) || Host(`bbmapi.mauzo.tz`)
+      traefik.http.routers.bbm-http.entrypoints: web
+      traefik.http.routers.bbm-http.middlewares: bbm-https
+      traefik.http.routers.bbm-http.service: bbm
+      traefik.http.middlewares.bbm-https.redirectscheme.scheme: https
+      traefik.http.middlewares.bbm-https.redirectscheme.permanent: "true"
+    logging: *logging
+
+networks:
+  application:
+  proxy:
+    external: true
+    name: dokploy-network
+
+volumes:
+  pgdata:
+  staticfiles:
+  media:
+  private_media:

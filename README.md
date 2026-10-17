@@ -127,6 +127,18 @@ the container never mix with anything you install locally.
 
 `nginx` isn't in `docker-compose.yml` yet.
 
+**Production:** [VPS deployment guide](docs/DEPLOYMENT.md) describes the separate
+`compose.production.yml`, GHCR images, and existing Dokploy Traefik routing for
+`bbm.mauzo.tz` / `bbmapi.mauzo.tz`. Nginx serves collected static files and public
+product images from shared volumes; private receipts remain API-only. The
+development commands below are unchanged.
+
+An optional GitHub Actions deployment job transfers the production Compose as
+`/opt/apps/bbm/docker-compose.yml` and generates its `.env` from a protected
+environment secret. See the guide's **Enable GitHub Actions deployment** section
+for required SSH/registry secrets, production approval settings and the
+`ENABLE_PRODUCTION_DEPLOY` repository variable (disabled by default).
+
 ---
 
 ## 1. Environment files
@@ -317,7 +329,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (201 tests)
+docker compose exec backend python manage.py test            # whole suite (203 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
