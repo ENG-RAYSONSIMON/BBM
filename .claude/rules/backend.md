@@ -74,7 +74,7 @@ if the container is down). There is no local Python environment to rely on.
   (`PERMISSIONS` and `DEFAULT_ROLE_PERMISSIONS`) **and** a data migration in
   `accounts/` that seeds it and grants it to existing system roles, using
   literal codenames (copy the latest,
-  `0007_phase4_audit_permission.py`). Mirror it in
+  `0008_phase4_reports_permissions.py`). Mirror it in
   `frontend/src/lib/types.ts` `PERMISSIONS`.
 
 ## API conventions

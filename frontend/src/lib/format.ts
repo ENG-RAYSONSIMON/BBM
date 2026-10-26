@@ -48,3 +48,17 @@ export function formatDateTime(value: string): string {
 export function formatQuantity(quantity: number): string {
   return quantity > 0 ? `+${quantity}` : `−${Math.abs(quantity)}`
 }
+
+const monthFormats = new Map<string, Intl.DateTimeFormat>()
+
+/** "Oct 2026" / "Okt 2026" for the month holding an API date. */
+export function formatMonth(value: string): string {
+  const language = currentLanguage()
+  let format = monthFormats.get(language)
+  if (!format) {
+    format = new Intl.DateTimeFormat(DATE_LOCALES[language], { month: 'short', year: 'numeric' })
+    monthFormats.set(language, format)
+  }
+  const [y, m] = value.slice(0, 7).split('-').map(Number)
+  return format.format(new Date(y, m - 1, 1))
+}

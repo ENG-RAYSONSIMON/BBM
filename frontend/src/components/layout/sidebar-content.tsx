@@ -1,4 +1,5 @@
 import {
+  BarChart3Icon,
   BellRingIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -34,7 +35,7 @@ type NavItem = {
 
 type NavLabel =
   | 'dashboard' | 'newSale' | 'sales' | 'customers' | 'purchases' | 'expenses'
-  | 'products' | 'inventory' | 'catalog' | 'settings' | 'audit'
+  | 'products' | 'inventory' | 'catalog' | 'settings' | 'reports' | 'audit'
 
 // Only features that exist get a link. Labels are keys under `nav`.
 const NAV: NavItem[] = [
@@ -47,6 +48,7 @@ const NAV: NavItem[] = [
   { to: '/products', label: 'products', icon: PackageIcon, permission: PERMISSIONS.catalogView },
   { to: '/inventory', label: 'inventory', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
   { to: '/catalog', label: 'catalog', icon: TagsIcon, permission: PERMISSIONS.catalogView },
+  { to: '/reports', label: 'reports', icon: BarChart3Icon, permission: PERMISSIONS.reportsView },
   { to: '/settings', label: 'settings', icon: SettingsIcon, permission: PERMISSIONS.settingsView },
   { to: '/audit', label: 'audit', icon: ShieldCheckIcon, permission: PERMISSIONS.auditView },
 ]

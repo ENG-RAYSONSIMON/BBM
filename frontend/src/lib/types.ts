@@ -59,6 +59,8 @@ export const PERMISSIONS = {
   expensesManage: 'expenses.manage',
   expensesDelete: 'expenses.delete',
   auditView: 'audit.view',
+  reportsView: 'reports.view',
+  reportsExport: 'reports.export',
 } as const
 
 /** DRF page-number pagination envelope. */
@@ -363,4 +365,89 @@ export type AuditLogEntry = {
   changes: Record<string, unknown>
   ip_address: string | null
   created_at: string
+}
+
+// ---- FR-18 reports ----
+
+export const REPORT_PERIODS = ['day', 'week', 'month', 'year'] as const
+export type ReportPeriod = (typeof REPORT_PERIODS)[number]
+
+type PeriodReport<Row, Totals> = {
+  period: ReportPeriod
+  date_from: string
+  date_to: string
+  rows: Row[]
+  totals: Totals
+}
+
+export type SalesReportRow = {
+  /** First day of the period (weeks start on Monday). */
+  period: string
+  sales_count: number
+  revenue: string
+  discounts: string
+  cogs: string
+  gross_profit: string
+  cash_collected: string
+}
+export type SalesReport = PeriodReport<SalesReportRow, Omit<SalesReportRow, 'period'>>
+
+export type ProfitReportRow = {
+  period: string
+  revenue: string
+  cogs: string
+  gross_profit: string
+  expenses: string
+  net_profit: string
+}
+export type ProfitReport = PeriodReport<ProfitReportRow, Omit<ProfitReportRow, 'period'>>
+
+export type ExpensesReportRow = {
+  period: string
+  category: string
+  category_name: string
+  count: number
+  total: string
+}
+export type ExpensesReport = PeriodReport<ExpensesReportRow, { count: number; total: string }>
+
+export type StockValuationRow = {
+  product: string
+  name: string
+  sku: string
+  category_name: string
+  unit: string
+  is_active: boolean
+  stock_on_hand: number
+  cost_price: string
+  selling_price: string
+  cost_value: string
+  retail_value: string
+}
+export type StockValuationReport = {
+  as_of: string
+  rows: StockValuationRow[]
+  totals: { product_count: number; stock_on_hand: number; cost_value: string; retail_value: string }
+}
+
+export type ExpiryReportRow = {
+  batch: string
+  product: string
+  name: string
+  sku: string
+  batch_number: string
+  expiry_date: string
+  /** Negative once expired. */
+  days_left: number
+  status: 'expired' | 'expiring'
+  is_active: boolean
+  stock_on_hand: number
+  cost_price: string
+  cost_value: string
+}
+export type ExpiryReport = {
+  as_of: string
+  within_days: number
+  rows: ExpiryReportRow[]
+  totals: { batch_count: number; stock_on_hand: number; cost_value: string; expired_value: string }
 }

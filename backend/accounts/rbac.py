@@ -27,6 +27,8 @@ EXPENSES_VIEW = "expenses.view"
 EXPENSES_MANAGE = "expenses.manage"
 EXPENSES_DELETE = "expenses.delete"
 AUDIT_VIEW = "audit.view"
+REPORTS_VIEW = "reports.view"
+REPORTS_EXPORT = "reports.export"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
@@ -45,6 +47,8 @@ PERMISSIONS = {
     EXPENSES_MANAGE: "Record and edit expenses and their receipts, and manage expense categories.",
     EXPENSES_DELETE: "Delete expenses and expense categories.",
     AUDIT_VIEW: "View the audit log of sensitive actions.",
+    REPORTS_VIEW: "View sales, profit, expense, stock-valuation and expiry reports.",
+    REPORTS_EXPORT: "Download reports as CSV.",
 }
 
 DEFAULT_ROLE_PERMISSIONS = {
@@ -64,6 +68,8 @@ DEFAULT_ROLE_PERMISSIONS = {
             PURCHASES_MANAGE,
             EXPENSES_VIEW,
             EXPENSES_MANAGE,
+            REPORTS_VIEW,
+            REPORTS_EXPORT,
         }
     ),
 }

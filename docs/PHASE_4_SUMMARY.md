@@ -1,10 +1,10 @@
-# Phase 4 — Reporting, Notifications & Audit (step 1: audit log)
+# Phase 4 — Reporting, Notifications & Audit (step 1: audit log, step 2: reports)
 
 Covers **FR-20** (sensitive actions logged, readable only by the Owner) from
 `docs/BBM_SRS_Summary_Draft.pdf`. Reports with CSV export (FR-18) are step 2
 and the notification centre (FR-19) is step 3.
 
-Status as of 2026-10-26: step 1 implemented, not yet committed.
+Status as of 2026-10-26: step 1 committed (`a0ac5a8`); step 2 is at the end of this file.
 - Backend: 219 tests (203 before, 16 new). The schema validates with `--fail-on-warn`.
 - Frontend: 83 Vitest tests (4 new).
 
@@ -57,3 +57,57 @@ Decisions taken with the product owner:
 - [ ] Creates (new products, sales, etc.) aren't logged; the SRS asks only for sensitive actions.
 - [ ] Product edits (e.g. a price change) and stock adjustments aren't audit-logged; adjustments are already in the stock ledger with who and why.
 - [ ] Deleting a user who has audit entries is refused (`actor` is PROTECT), so who-did-what is never lost.
+
+---
+
+# Step 2: reports with CSV export (FR-18)
+
+Status as of 2026-10-26: implemented, not yet committed.
+- Backend: 238 tests (219 after step 1, 19 new). The schema validates with `--fail-on-warn`.
+- Frontend: 88 Vitest tests (5 new).
+
+Decisions:
+- **Reports:** sales, profit, expenses (by day, week, month or year), stock value, and expiry.
+- **Default range:** the last 30 days, by day. A daily report is limited to 366 days; pick week, month or year for longer ranges. Dates must fall between 2000 and a year from today, and a range can be at most 10 years (400 otherwise, never a 500).
+- **Weeks start on Monday.** A period's row is labelled with its first day, even when the range starts mid-period (the figures still only count dates inside the range).
+- **Owner and Admin** get `reports.view` and `reports.export` by default. Like every permission, a business can change that per role. Downloading needs both: export alone is refused.
+- **Every CSV download is audit-logged** (`EXPORT`, with the report, its parameters and row count).
+
+## S2.1 App: `reports` (no models)
+
+**`reports/services.py`**, read-only, all through the tenant-scoped managers:
+
+| Report | Rows | Source |
+|---|---|---|
+| `sales_report` | per period: sales, revenue, discounts, cost of goods, gross profit, cash collected | completed sales' snapshots (`total`, `cost_total`; voids left out), payment ledger (payments − refunds) |
+| `profit_report` | per period: revenue, cost of goods, gross profit, expenses, net profit | sale snapshots, expenses by `expense_date` |
+| `expenses_report` | per period × category with spending | expenses |
+| `stock_valuation_report` | per product holding stock (archived too): stock, cost and selling price, value at each | stock ledger × the product's **current** prices (batch cost isn't stored) |
+| `expiry_report` | batches with stock (archived products too, marked), expired or expiring within N days (default 60), soonest first | stock ledger, value at current cost |
+
+Periods are cut with `Trunc(..., output_field=DateField())` in the shop's time zone (Africa/Dar_es_Salaam), and empty periods are filled with zeros so charts have no gaps.
+
+## S2.2 API
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/api/v1/reports/{sales,profit,expenses}/?period=&date_from=&date_to=` | `reports.view` |
+| GET | `/api/v1/reports/stock-valuation/` | `reports.view` |
+| GET | `/api/v1/reports/expiry/?within_days=` (1–365) | `reports.view` |
+| GET | `/api/v1/reports/<report>/export/` with the same parameters | `reports.export` |
+
+JSON answers carry `rows` and `totals` (plus `period`/`date_from`/`date_to`, or `as_of`). CSV is UTF-8 with a BOM so Excel shows Kiswahili correctly; column headers follow `Accept-Language`. Text that starts like a formula (`=`, `+`, `-`, `@`) is written with a leading `'` so Excel shows it as text; numbers, including negative profit, stay numbers. Bad parameters are 400 and nothing is logged.
+
+## S2.3 Frontend
+
+- `/reports` page (`pages/reports.tsx`): report buttons, "show by" day/week/month/year, date range, expiry window (30/60/90 days). Each report has total tiles, a bar chart (sales value, net profit or expenses per period) and a full table (cards on mobile). The table is the text view of the chart.
+- "Download CSV" appears only with `reports.export`.
+- Charts use Recharts (now a dependency), one hue (`--report-series` in `index.css`), validated for contrast on light and dark cards. The page is a lazy chunk; Recharts adds about 106 kB gzipped there, not to the main bundle.
+- Sidebar link "Reports" / "Ripoti" with `reports.view`.
+
+## S2.4 Known gaps
+
+- [ ] Stock value and expiry value use each product's latest cost price (said in the API's field help and on the page), not what each batch cost. Received batches' real costs are on their `PurchaseItem`; valuing each batch at that, falling back to the cost price for opening stock and adjustments, is a follow-up.
+- [ ] No outstanding-credit column per period; the dashboard shows what customers owe overall.
+- [ ] The reports permission shows profit and expense figures even to a role without `expenses.view` (the dashboard hides them in that case).
+- [ ] Reports aren't cached; each request queries live data. Fine at single-shop volumes.

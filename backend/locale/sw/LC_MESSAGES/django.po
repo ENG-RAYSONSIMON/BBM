@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BBM\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-13 10:52+0300\n"
+"POT-Creation-Date: 2026-10-26 11:59+0300\n"
 "Language: sw\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -22,7 +22,7 @@ msgstr "Barua pepe au nenosiri si sahihi."
 msgid "A user with this email already exists."
 msgstr "Tayari kuna akaunti yenye barua pepe hii."
 
-#: accounts/serializers.py:28 core/authentication.py:26
+#: accounts/serializers.py:28 core/authentication.py:27
 msgid "No active business membership for this token."
 msgstr "Huna tena ruhusa kwenye biashara hii. Ingia upya."
 
@@ -42,7 +42,7 @@ msgstr "Akaunti hii ina biashara zaidi ya moja; chagua moja."
 msgid "Token is invalid or expired."
 msgstr "Kiungo si sahihi au muda wake umeisha."
 
-#: accounts/views.py:28
+#: accounts/views.py:31
 msgid "If an account exists for this email, a reset link has been sent."
 msgstr ""
 "Kama kuna akaunti yenye barua pepe hii, tumetuma kiungo cha kubadilisha "
@@ -84,20 +84,20 @@ msgstr "Picha ni kubwa sana. Isizidi pikseli %(size)s×%(size)s."
 msgid "This file isn't a valid image. Use a JPEG, PNG or WebP image."
 msgstr "Faili hii si picha sahihi. Tumia picha ya JPEG, PNG au WebP."
 
-#: catalog/views.py:56
+#: catalog/views.py:57
 msgid "This category still has products. Move them to another category first."
 msgstr "Aina hii bado ina bidhaa. Zihamishe kwenye aina nyingine kwanza."
 
-#: catalog/views.py:66
+#: catalog/views.py:67
 msgid "This brand still has products. Move them to another brand first."
 msgstr "Chapa hii bado ina bidhaa. Zihamishe kwenye chapa nyingine kwanza."
 
-#: catalog/views.py:76
+#: catalog/views.py:77
 msgid "This supplier still has products. Move them to another supplier first."
 msgstr ""
 "Msambazaji huyu bado ana bidhaa. Zihamishe kwa msambazaji mwingine kwanza."
 
-#: catalog/views.py:125
+#: catalog/views.py:126
 msgid ""
 "This product has stock history and can't be deleted. Archive it instead."
 msgstr ""
@@ -271,7 +271,7 @@ msgid_plural "Expected available in {wait} seconds."
 msgstr[0] "Subiri sekunde {wait}."
 msgstr[1] "Subiri sekunde {wait}."
 
-#: core/views.py:9
+#: core/views.py:12
 msgid "This record is in use and cannot be deleted."
 msgstr "Hiki bado kinatumika, hakiwezi kufutwa."
 
@@ -288,19 +288,19 @@ msgstr "Faili ni kubwa sana. Mwisho ni MB %(mb)s."
 msgid "Use a photo (JPEG, PNG or WebP) or a PDF of the receipt."
 msgstr "Tumia picha (JPEG, PNG au WebP) au PDF ya risiti."
 
-#: expenses/views.py:59
+#: expenses/views.py:60
 msgid "This category has expenses and can't be deleted."
 msgstr "Aina hii ina matumizi, haiwezi kufutwa."
 
-#: expenses/views.py:133
+#: expenses/views.py:141
 msgid "This expense has no receipt."
 msgstr "Matumizi haya hayana risiti."
 
-#: expenses/views.py:194 sales/views.py:241
+#: expenses/views.py:204 sales/views.py:241
 msgid "Use a date like 2026-10-10."
 msgstr "Weka tarehe kama 2026-10-10."
 
-#: expenses/views.py:214 sales/views.py:226
+#: expenses/views.py:224 reports/serializers.py:31 sales/views.py:226
 msgid "The end date is before the start date."
 msgstr "Tarehe ya mwisho iko kabla ya tarehe ya kuanza."
 
@@ -356,68 +356,172 @@ msgstr "Bechi mpya za bidhaa hii zinahitaji tarehe ya kuisha."
 msgid "Use a whole number of days from 1 to 365."
 msgstr "Weka idadi kamili ya siku kati ya 1 na 365."
 
-#: purchases/services.py:38
+#: purchases/services.py:39
 msgid "Add at least one product to the purchase."
 msgstr "Ongeza angalau bidhaa moja kwenye manunuzi."
 
-#: purchases/services.py:49
+#: purchases/services.py:50
 #, python-format
 msgid "%(name)s is archived. Reactivate it before buying more."
 msgstr "%(name)s imewekwa pembeni. Irudishe kwanza kabla ya kununua tena."
 
-#: purchases/services.py:51 sales/services.py:184
+#: purchases/services.py:52 sales/services.py:185
 #, python-format
 msgid "%(name)s: quantity must be at least 1."
 msgstr "%(name)s: idadi iwe angalau 1."
 
-#: purchases/services.py:53
+#: purchases/services.py:54
 #, python-format
 msgid "%(name)s: the unit cost can't be negative."
 msgstr "%(name)s: bei ya kununua haiwezi kuwa chini ya 0."
 
-#: purchases/services.py:58
+#: purchases/services.py:59
 #, python-format
 msgid "%(name)s: enter the batch number printed on the stock."
 msgstr "%(name)s: weka namba ya bechi iliyo kwenye mzigo."
 
-#: purchases/services.py:65
+#: purchases/services.py:66
 #, python-format
 msgid "%(name)s: batch %(batch)s is new and needs an expiry date."
 msgstr "%(name)s: bechi %(batch)s ni mpya, inahitaji tarehe ya kuisha."
 
-#: purchases/services.py:74
+#: purchases/services.py:75
 #, python-format
 msgid "%(name)s: batch %(batch)s already exists with a different expiry date."
 msgstr "%(name)s: bechi %(batch)s tayari ipo na tarehe tofauti ya kuisha."
 
-#: purchases/services.py:86
+#: purchases/services.py:87
 #, python-format
 msgid "%(name)s is listed twice for the same batch. Use one line."
 msgstr "%(name)s imeandikwa mara mbili kwa bechi moja. Tumia mstari mmoja."
 
-#: purchases/services.py:115
+#: purchases/services.py:116
 msgid "Only a draft purchase can be edited."
 msgstr "Manunuzi ya rasimu tu ndiyo yanaweza kubadilishwa."
 
-#: purchases/services.py:136
+#: purchases/services.py:137
 msgid "This purchase is already received."
 msgstr "Manunuzi haya yameshapokelewa."
 
-#: purchases/services.py:138
+#: purchases/services.py:139
 msgid "This purchase is already cancelled."
 msgstr "Manunuzi haya yameshaghairiwa."
 
-#: purchases/services.py:142
+#: purchases/services.py:143
 msgid "Add at least one product before receiving."
 msgstr "Ongeza angalau bidhaa moja kabla ya kupokea."
 
-#: purchases/services.py:197
+#: purchases/services.py:198
 msgid "Say why the purchase is being cancelled."
 msgstr "Eleza kwa nini unaghairi manunuzi haya."
 
-#: purchases/services.py:200
+#: purchases/services.py:201
 msgid "Only a draft purchase can be cancelled."
 msgstr "Manunuzi ya rasimu tu ndiyo yanaweza kughairiwa."
+
+#: reports/serializers.py:27
+msgid "Pick a date between 2000 and next year."
+msgstr "Chagua tarehe kati ya mwaka 2000 na mwaka ujao."
+
+#: reports/serializers.py:33
+msgid "That range is too long. Pick 10 years or less."
+msgstr "Muda huo ni mrefu mno. Chagua miaka 10 au chini."
+
+#: reports/serializers.py:36
+msgid "That is too many days. Show it by week, month or year instead."
+msgstr "Siku ni nyingi mno. Onyesha kwa wiki, mwezi au mwaka badala yake."
+
+#: reports/views.py:26
+msgid "Period starting"
+msgstr "Kipindi kinaanza"
+
+#: reports/views.py:30
+msgid "Number of sales"
+msgstr "Idadi ya mauzo"
+
+#: reports/views.py:31 reports/views.py:39
+msgid "Revenue (TZS)"
+msgstr "Mapato (TZS)"
+
+#: reports/views.py:32
+msgid "Discounts (TZS)"
+msgstr "Punguzo (TZS)"
+
+#: reports/views.py:33 reports/views.py:40
+msgid "Cost of goods sold (TZS)"
+msgstr "Gharama ya bidhaa zilizouzwa (TZS)"
+
+#: reports/views.py:34 reports/views.py:41
+msgid "Gross profit (TZS)"
+msgstr "Faida (TZS)"
+
+#: reports/views.py:35
+msgid "Cash collected (TZS)"
+msgstr "Pesa iliyopokelewa (TZS)"
+
+#: reports/views.py:42
+msgid "Expenses (TZS)"
+msgstr "Matumizi (TZS)"
+
+#: reports/views.py:43
+msgid "Net profit (TZS)"
+msgstr "Faida halisi (TZS)"
+
+#: reports/views.py:47 reports/views.py:54
+msgid "Category"
+msgstr "Aina"
+
+#: reports/views.py:48
+msgid "Number of expenses"
+msgstr "Idadi ya matumizi"
+
+#: reports/views.py:49
+msgid "Total (TZS)"
+msgstr "Jumla (TZS)"
+
+#: reports/views.py:52 reports/views.py:63
+msgid "Product"
+msgstr "Bidhaa"
+
+#: reports/views.py:53 reports/views.py:64
+msgid "SKU"
+msgstr "SKU"
+
+#: reports/views.py:55 reports/views.py:68
+msgid "Stock"
+msgstr "Stoki"
+
+#: reports/views.py:56
+msgid "Unit"
+msgstr "Kipimo"
+
+#: reports/views.py:57
+msgid "Cost price (TZS)"
+msgstr "Bei ya kununua (TZS)"
+
+#: reports/views.py:58
+msgid "Selling price (TZS)"
+msgstr "Bei ya kuuza (TZS)"
+
+#: reports/views.py:59 reports/views.py:69
+msgid "Value at cost (TZS)"
+msgstr "Thamani kwa bei ya kununua (TZS)"
+
+#: reports/views.py:60
+msgid "Value at selling price (TZS)"
+msgstr "Thamani kwa bei ya kuuza (TZS)"
+
+#: reports/views.py:65
+msgid "Batch"
+msgstr "Bechi"
+
+#: reports/views.py:66
+msgid "Expiry date"
+msgstr "Tarehe ya kuisha muda"
+
+#: reports/views.py:67
+msgid "Days left"
+msgstr "Siku zilizobaki"
 
 #: sales/serializers.py:45
 msgid "A customer with this phone number already exists."
@@ -431,30 +535,30 @@ msgstr "Tayari kuna mteja mwenye namba hii ya simu. Mchague yeye."
 msgid "Choose an existing customer or enter a new one, not both."
 msgstr "Chagua mteja aliyepo au weka mpya, si vyote viwili."
 
-#: sales/services.py:170
+#: sales/services.py:171
 msgid "Add at least one product to the sale."
 msgstr "Ongeza angalau bidhaa moja kwenye mauzo."
 
-#: sales/services.py:178
+#: sales/services.py:179
 #, python-format
 msgid "%(name)s is listed twice. Use one line per product."
 msgstr "%(name)s imeandikwa mara mbili. Tumia mstari mmoja kwa kila bidhaa."
 
-#: sales/services.py:182
+#: sales/services.py:183
 #, python-format
 msgid "%(name)s is archived and can't be sold."
 msgstr "%(name)s imewekwa pembeni, haiwezi kuuzwa."
 
-#: sales/services.py:192
+#: sales/services.py:193
 #, python-format
 msgid "%(name)s: the discount must be between 0 and %(max)s."
 msgstr "%(name)s: punguzo liwe kati ya 0 na %(max)s."
 
-#: sales/services.py:222
+#: sales/services.py:223
 msgid "Enter the cash received (0 or more)."
 msgstr "Weka pesa uliyopokea (0 au zaidi)."
 
-#: sales/services.py:231
+#: sales/services.py:232
 msgid ""
 "The cash received is less than the total. Choose the customer who owes the "
 "rest."
@@ -462,28 +566,28 @@ msgstr ""
 "Pesa uliyopokea ni pungufu ya jumla. Chagua mteja anayedaiwa kiasi "
 "kilichobaki."
 
-#: sales/services.py:250
+#: sales/services.py:251
 #, python-format
 msgid "%(name)s: only %(count)s available to sell."
 msgstr "%(name)s: zimebaki %(count)s tu za kuuza."
 
-#: sales/services.py:321
+#: sales/services.py:322
 msgid "This sale is void."
 msgstr "Mauzo haya yamebatilishwa."
 
-#: sales/services.py:323
+#: sales/services.py:324
 msgid "Nothing is owed on this sale."
 msgstr "Hakuna deni kwenye mauzo haya."
 
-#: sales/services.py:325
+#: sales/services.py:326
 msgid "Enter the cash received."
 msgstr "Weka pesa uliyopokea."
 
-#: sales/services.py:344
+#: sales/services.py:345
 msgid "Say why the sale is being voided."
 msgstr "Eleza kwa nini unabatilisha mauzo haya."
 
-#: sales/services.py:347
+#: sales/services.py:348
 msgid "This sale is already void."
 msgstr "Mauzo haya yameshabatilishwa."
 

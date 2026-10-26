@@ -16,6 +16,13 @@ describe('SidebarContent', () => {
     expect(nav).not.toHaveTextContent('Audit log')
   })
 
+  it('shows reports with reports.view', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['reports.view'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(nav).toHaveTextContent('Reports')
+    expect(nav).not.toHaveTextContent('Audit log')
+  })
+
   it('shows the audit log only with audit.view', async () => {
     renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['audit.view'])
     const nav = await screen.findByRole('navigation', { name: 'Main' })

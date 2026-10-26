@@ -30,7 +30,7 @@ permissions, tests, frontend pages) and wait for approval before writing code.
       Admin never gets `.delete`).
 - [ ] Data migration in `accounts/` seeding the codenames and granting them
       to existing Owner/Admin system roles — copy the latest,
-      `0007_phase4_audit_permission.py`,
+      `0008_phase4_reports_permissions.py`,
       literal codenames, explicit `business_id`.
 - [ ] Mirror in `frontend/src/lib/types.ts` `PERMISSIONS`.
 
