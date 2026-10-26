@@ -8,12 +8,13 @@ import { AuthLayout } from '@/components/layout/auth-layout'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth'
 import { DashboardPage } from '@/pages/dashboard'
+import { ChangePasswordPage } from '@/pages/change-password'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { LoginPage } from '@/pages/login'
 import { ProductFormPage } from '@/pages/product-form'
 import { RegisterPage } from '@/pages/register'
 import { ResetPasswordPage } from '@/pages/reset-password'
-import { RedirectIfAuthed, RequireAuth } from '@/routes/guards'
+import { CHANGE_PASSWORD_PATH, RedirectIfAuthed, RequireAuth } from '@/routes/guards'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,8 @@ const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      // Outside the shell: on a temporary password it is the only page.
+      { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
       {
         element: <AppShell />,
         children: [
@@ -74,6 +77,7 @@ const router = createBrowserRouter([
           { path: '/settings', lazy: () => import('@/pages/settings').then((m) => ({ Component: m.SettingsPage })) },
           { path: '/reports', lazy: () => import('@/pages/reports').then((m) => ({ Component: m.ReportsPage })) },
           { path: '/notifications', lazy: () => import('@/pages/notifications').then((m) => ({ Component: m.NotificationsPage })) },
+          { path: '/staff', lazy: () => import('@/pages/staff').then((m) => ({ Component: m.StaffPage })) },
           { path: '/audit', lazy: () => import('@/pages/audit').then((m) => ({ Component: m.AuditPage })) },
         ],
       },

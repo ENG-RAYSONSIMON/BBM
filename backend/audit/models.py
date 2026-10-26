@@ -36,6 +36,9 @@ class AuditLog(TenantModel):
         PURCHASE_CANCEL = "PURCHASE_CANCEL", "Purchase cancel"
         EXPENSE_CHANGE = "EXPENSE_CHANGE", "Expense change"
         EXPORT = "EXPORT", "Export"
+        STAFF_ADD = "STAFF_ADD", "Staff added"
+        STAFF_CHANGE = "STAFF_CHANGE", "Staff changed"
+        STAFF_PASSWORD_RESET = "STAFF_PASSWORD_RESET", "Staff password reset"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

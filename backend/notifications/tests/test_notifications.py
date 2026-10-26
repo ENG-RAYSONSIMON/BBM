@@ -158,7 +158,7 @@ class CentreAPITests(TenantAPITestCase):
     def test_read_all_marks_only_what_the_caller_sees(self):
         with tenant_context(self.business_a):
             Notification.objects.create(kind="LOW_STOCK", recipient=self.admin_a, dedupe_key="personal")
-        cashier = make_member(self.business_a, "cashier@example.com", "Cashier")
+        cashier = make_member(self.business_a, "helper@example.com", "Helper")
         self.as_user(cashier, self.business_a)  # no inventory.view: sees nothing
         self.assertEqual(self.client.post(READ_ALL_URL).status_code, 204)
         self.assertFalse(NotificationRead.all_objects.filter(user=cashier).exists())
@@ -176,7 +176,7 @@ class CentreAPITests(TenantAPITestCase):
         self.assertEqual(self.client.get(LIST_URL, {"open": "true"}).data["count"], 0)
 
     def test_needs_the_alerts_permission(self):
-        cashier = make_member(self.business_a, "cashier@example.com", "Cashier")
+        cashier = make_member(self.business_a, "helper@example.com", "Helper")
         self.as_user(cashier, self.business_a)
         self.assertEqual(self.client.get(LIST_URL).data["count"], 0)
         self.assertEqual(self.client.get(COUNT_URL).data, {"unread": 0})

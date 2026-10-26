@@ -39,6 +39,33 @@ export const resetPasswordSchema = z
   })
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>
 
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, 'errors.enterPassword'),
+    new_password: newPassword,
+    confirm_password: z.string(),
+  })
+  .refine((v) => v.new_password === v.confirm_password, {
+    path: ['confirm_password'],
+    message: 'errors.passwordsDontMatch',
+  })
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>
+
+// ---- Staff --------------------------------------------------------------------
+
+export const staffSchema = z.object({
+  first_name: z.string().trim().max(150),
+  last_name: z.string().trim().max(150),
+  email,
+  phone: z.string().trim().max(20),
+  role: z.string().min(1, 'errors.chooseRole'),
+  temp_password: newPassword,
+})
+export type StaffValues = z.infer<typeof staffSchema>
+
+export const staffPasswordSchema = z.object({ temp_password: newPassword })
+export type StaffPasswordValues = z.infer<typeof staffPasswordSchema>
+
 const wholeNumber = z
   .number({ error: 'errors.enterNumber' })
   .int('errors.wholeNumber')

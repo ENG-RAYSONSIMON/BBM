@@ -74,8 +74,14 @@ if the container is down). There is no local Python environment to rely on.
   (`PERMISSIONS` and `DEFAULT_ROLE_PERMISSIONS`) **and** a data migration in
   `accounts/` that seeds it and grants it to existing system roles, using
   literal codenames (copy the latest,
-  `0008_phase4_reports_permissions.py`). Mirror it in
+  `0009_staff_roles_permissions.py`). Mirror it in
   `frontend/src/lib/types.ts` `PERMISSIONS`.
+- Buying cost and profit are shown only with `finance.view`: list such
+  fields in `finance_fields` on a serializer using
+  `core.serializers.FinanceFieldsMixin`. For other in-view decisions use
+  `core.permissions.has_permission(request, codename)`.
+- A user on a temporary password (`must_change_password`) gets 403 on every
+  view except those with `allow_pending_password_change = True`.
 
 ## API conventions
 - Routes live under `/api/v1/`, namespaced per app (`catalog:product-detail`).

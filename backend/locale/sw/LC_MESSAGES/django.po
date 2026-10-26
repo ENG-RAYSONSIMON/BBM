@@ -7,60 +7,100 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BBM\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-26 11:59+0300\n"
+"POT-Creation-Date: 2026-10-26 14:41+0300\n"
 "Language: sw\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: accounts/serializers.py:26
+#: accounts/serializers.py:27
 msgid "No active account found with the given credentials."
 msgstr "Barua pepe au nenosiri si sahihi."
 
-#: accounts/serializers.py:27
+#: accounts/serializers.py:28
 msgid "A user with this email already exists."
 msgstr "Tayari kuna akaunti yenye barua pepe hii."
 
-#: accounts/serializers.py:28 core/authentication.py:27
+#: accounts/serializers.py:29 core/authentication.py:27
 msgid "No active business membership for this token."
 msgstr "Huna tena ruhusa kwenye biashara hii. Ingia upya."
 
-#: accounts/serializers.py:29
+#: accounts/serializers.py:30
 msgid "Reset link is invalid or expired."
 msgstr "Kiungo si sahihi au muda wake umeisha."
 
-#: accounts/serializers.py:140
+#: accounts/serializers.py:141
 msgid "You are not a member of this business."
 msgstr "Wewe si mwanachama wa biashara hii."
 
-#: accounts/serializers.py:147
+#: accounts/serializers.py:148
 msgid "This account belongs to several businesses; choose one."
 msgstr "Akaunti hii ina biashara zaidi ya moja; chagua moja."
 
-#: accounts/serializers.py:179 accounts/serializers.py:181
+#: accounts/serializers.py:181 accounts/serializers.py:183
 msgid "Token is invalid or expired."
 msgstr "Kiungo si sahihi au muda wake umeisha."
 
-#: accounts/views.py:31
+#: accounts/services.py:211
+msgid "Your current password is wrong."
+msgstr "Nenosiri lako la sasa si sahihi."
+
+#: accounts/services.py:217
+msgid "Choose a password different from the current one."
+msgstr "Chagua nenosiri tofauti na la sasa."
+
+#: accounts/services.py:257
+msgid "You can't give this role."
+msgstr "Huwezi kutoa nafasi hii."
+
+#: accounts/services.py:263
+msgid "This account can't be changed here."
+msgstr "Akaunti hii haiwezi kubadilishwa hapa."
+
+#: accounts/services.py:265
+msgid "You can't change your own access."
+msgstr "Huwezi kubadilisha ruhusa zako mwenyewe."
+
+#: accounts/services.py:268
+msgid "You can't change this person: their role is not below yours."
+msgstr "Huwezi kumbadilisha mtu huyu: nafasi yake si chini ya yako."
+
+#: accounts/services.py:274
+msgid "Enter a temporary password."
+msgstr "Weka nenosiri la muda."
+
+#: accounts/services.py:296
+msgid "This email already has an account. Use a different email."
+msgstr "Barua pepe hii tayari ina akaunti. Tumia barua pepe nyingine."
+
+#: accounts/services.py:355
+msgid ""
+"This person also uses their account at another business. Ask them to use "
+"“Forgot password” instead."
+msgstr ""
+"Mtu huyu anatumia akaunti yake kwenye biashara nyingine pia. Mwambie atumie "
+"“Umesahau nenosiri” badala yake."
+
+#: accounts/views.py:47
 msgid "If an account exists for this email, a reset link has been sent."
 msgstr ""
 "Kama kuna akaunti yenye barua pepe hii, tumetuma kiungo cha kubadilisha "
 "nenosiri."
 
-#: catalog/serializers.py:8
+#: catalog/serializers.py:10
 msgid "This name is already used. Choose another one."
 msgstr "Jina hili tayari linatumika. Chagua jingine."
 
-#: catalog/serializers.py:9
+#: catalog/serializers.py:11
 msgid "This SKU is already used by another product."
 msgstr "SKU hii tayari inatumiwa na bidhaa nyingine."
 
-#: catalog/serializers.py:10
+#: catalog/serializers.py:12
 msgid "This barcode is already used by another product."
 msgstr "Barcode hii tayari inatumiwa na bidhaa nyingine."
 
-#: catalog/serializers.py:137
+#: catalog/serializers.py:140
 msgid "Can't change expiry tracking once the product has batches."
 msgstr ""
 "Huwezi kubadilisha ufuatiliaji wa tarehe ya kuisha baada ya bidhaa kuwa na "
@@ -271,6 +311,10 @@ msgid_plural "Expected available in {wait} seconds."
 msgstr[0] "Subiri sekunde {wait}."
 msgstr[1] "Subiri sekunde {wait}."
 
+#: core/permissions.py:43
+msgid "Choose your own password first."
+msgstr "Kwanza chagua nenosiri lako mwenyewe."
+
 #: core/views.py:12
 msgid "This record is in use and cannot be deleted."
 msgstr "Hiki bado kinatumika, hakiwezi kufutwa."
@@ -296,11 +340,11 @@ msgstr "Aina hii ina matumizi, haiwezi kufutwa."
 msgid "This expense has no receipt."
 msgstr "Matumizi haya hayana risiti."
 
-#: expenses/views.py:204 sales/views.py:241
+#: expenses/views.py:204 sales/views.py:263
 msgid "Use a date like 2026-10-10."
 msgstr "Weka tarehe kama 2026-10-10."
 
-#: expenses/views.py:224 reports/serializers.py:31 sales/views.py:226
+#: expenses/views.py:224 reports/serializers.py:31 sales/views.py:245
 msgid "The end date is before the start date."
 msgstr "Tarehe ya mwisho iko kabla ya tarehe ya kuanza."
 
@@ -523,15 +567,15 @@ msgstr "Tarehe ya kuisha muda"
 msgid "Days left"
 msgstr "Siku zilizobaki"
 
-#: sales/serializers.py:45
+#: sales/serializers.py:46
 msgid "A customer with this phone number already exists."
 msgstr "Tayari kuna mteja mwenye namba hii ya simu."
 
-#: sales/serializers.py:57
+#: sales/serializers.py:58
 msgid "A customer with this phone number already exists. Choose them instead."
 msgstr "Tayari kuna mteja mwenye namba hii ya simu. Mchague yeye."
 
-#: sales/serializers.py:91
+#: sales/serializers.py:92
 msgid "Choose an existing customer or enter a new one, not both."
 msgstr "Chagua mteja aliyepo au weka mpya, si vyote viwili."
 
@@ -591,6 +635,6 @@ msgstr "Eleza kwa nini unabatilisha mauzo haya."
 msgid "This sale is already void."
 msgstr "Mauzo haya yameshabatilishwa."
 
-#: sales/views.py:275
+#: sales/views.py:297
 msgid "This customer has sales and can't be deleted."
 msgstr "Mteja huyu ana mauzo, hawezi kufutwa."

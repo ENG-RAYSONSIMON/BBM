@@ -6,6 +6,8 @@ export type User = {
   first_name: string
   last_name: string
   phone: string
+  /** On a temporary password: the app only lets them choose a new one. */
+  must_change_password: boolean
 }
 
 export type Business = {
@@ -61,6 +63,10 @@ export const PERMISSIONS = {
   auditView: 'audit.view',
   reportsView: 'reports.view',
   reportsExport: 'reports.export',
+  salesViewAll: 'sales.view_all',
+  paymentsCreate: 'payments.create',
+  financeView: 'finance.view',
+  staffManage: 'staff.manage',
 } as const
 
 /** DRF page-number pagination envelope. */
@@ -112,7 +118,8 @@ export type Product = {
   supplier_detail: Ref | null
   /** Decimal strings, e.g. "15000.00". */
   selling_price: string
-  cost_price: string
+  /** Left out without finance.view. */
+  cost_price?: string
   reorder_level: number | null
   tracks_expiry: boolean
   image: string | null
@@ -201,8 +208,9 @@ export type Sale = {
   subtotal: string
   discount_total: string
   total: string
-  cost_total: string
-  gross_profit: string
+  /** Cost and profit are left out without finance.view. */
+  cost_total?: string
+  gross_profit?: string
   amount_paid: string
   balance: string
   payment_status: PaymentStatus
@@ -218,8 +226,9 @@ export type SaleItem = {
   unit_price: string
   discount: string
   line_total: string
-  unit_cost: string
-  line_cost: string
+  /** Left out without finance.view. */
+  unit_cost?: string
+  line_cost?: string
   allocations: { batch: string; batch_number: string; expiry_date: string | null; quantity: number }[]
 }
 
@@ -251,15 +260,16 @@ export type SalesSummary = {
   sales_count: number
   revenue: string
   discounts: string
-  cogs: string
-  gross_profit: string
+  /** Null without finance.view. */
+  cogs: string | null
+  gross_profit: string | null
   /** Payments − refunds in the range. */
   cash_collected: string
   /** Still owed on all sales, all time. */
   outstanding_credit: string
   /** Expenses dated in the range; null without expenses.view. */
   expenses: string | null
-  /** Gross profit − expenses; null without expenses.view. */
+  /** Gross profit − expenses; null without expenses.view and finance.view. */
   net_profit: string | null
 }
 
@@ -349,6 +359,9 @@ export const AUDIT_ACTIONS = [
   'PURCHASE_CANCEL',
   'EXPENSE_CHANGE',
   'EXPORT',
+  'STAFF_ADD',
+  'STAFF_CHANGE',
+  'STAFF_PASSWORD_RESET',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -476,4 +489,34 @@ export type AppNotification = {
   is_read: boolean
   resolved_at: string | null
   created_at: string
+}
+
+// ---- Staff ----
+
+/** A person's membership of the business; `id` is the membership id. */
+export type StaffMember = {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  phone: string
+  role: string
+  role_name: string
+  is_active: boolean
+  /** Still on a temporary password. */
+  must_change_password: boolean
+  last_login: string | null
+  is_you: boolean
+  /** Whether you may change their role, access or password. */
+  can_manage: boolean
+  created_at: string
+}
+
+export type Role = {
+  id: string
+  name: string
+  is_system: boolean
+  permissions: string[]
+  /** Whether you may give this role. */
+  assignable: boolean
 }

@@ -128,6 +128,13 @@ class PasswordResetTests(APITestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(self.login(PASSWORD).status_code, 401)
 
+    def test_reset_replaces_a_temporary_password(self):
+        self.user.must_change_password = True
+        self.user.save()
+        self.request_reset()
+        self.confirm(self.raw_token_from_last_email())
+        self.assertFalse(self.login(NEW_PASSWORD).data["user"]["must_change_password"])
+
     def test_requests_are_throttled(self):
         for _ in range(5):
             self.assertEqual(self.request_reset("nobody@example.com").status_code, 202)

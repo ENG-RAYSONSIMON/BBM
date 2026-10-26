@@ -1,6 +1,7 @@
 import {
   BarChart3Icon,
   BellRingIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   PackageIcon,
@@ -10,12 +11,13 @@ import {
   ShoppingCartIcon,
   TagsIcon,
   TruckIcon,
+  UserCogIcon,
   UsersIcon,
   WalletIcon,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NavLink, useNavigate } from 'react-router'
+import { Link, NavLink, useNavigate } from 'react-router'
 
 import { Brand } from './brand'
 import { LanguageToggle } from '@/components/language-toggle'
@@ -23,6 +25,7 @@ import { NotificationBell } from '@/components/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
+import { roleLabel } from '@/lib/roles'
 import { PERMISSIONS } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -36,7 +39,7 @@ type NavItem = {
 
 type NavLabel =
   | 'dashboard' | 'newSale' | 'sales' | 'customers' | 'purchases' | 'expenses'
-  | 'products' | 'inventory' | 'catalog' | 'settings' | 'reports' | 'audit'
+  | 'products' | 'inventory' | 'catalog' | 'settings' | 'reports' | 'staff' | 'audit'
 
 // Only features that exist get a link. Labels are keys under `nav`.
 const NAV: NavItem[] = [
@@ -50,6 +53,7 @@ const NAV: NavItem[] = [
   { to: '/inventory', label: 'inventory', icon: BellRingIcon, permission: PERMISSIONS.inventoryView },
   { to: '/catalog', label: 'catalog', icon: TagsIcon, permission: PERMISSIONS.catalogView },
   { to: '/reports', label: 'reports', icon: BarChart3Icon, permission: PERMISSIONS.reportsView },
+  { to: '/staff', label: 'staff', icon: UserCogIcon, permission: PERMISSIONS.staffManage },
   { to: '/settings', label: 'settings', icon: SettingsIcon, permission: PERMISSIONS.settingsView },
   { to: '/audit', label: 'audit', icon: ShieldCheckIcon, permission: PERMISSIONS.auditView },
 ]
@@ -103,13 +107,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div className="min-w-0 flex-1 text-sm">
             <p className="truncate font-medium">{me?.business.name}</p>
             <p className="text-muted-foreground truncate">
-              {displayName} · {me?.role}
+              {displayName} · {me && roleLabel(t, me.role)}
             </p>
           </div>
           <NotificationBell onNavigate={onNavigate} />
           <LanguageToggle />
           <ThemeToggle />
         </div>
+        <Button variant="ghost" size="lg" className="w-full justify-start" asChild>
+          <Link to="/change-password" onClick={onNavigate}>
+            <KeyRoundIcon />
+            {t('nav.myPassword')}
+          </Link>
+        </Button>
         <Button variant="ghost" size="lg" className="w-full justify-start" onClick={handleLogout}>
           <LogOutIcon />
           {t('nav.logout')}

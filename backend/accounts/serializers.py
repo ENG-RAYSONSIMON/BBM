@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
@@ -12,7 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.tenancy import TENANT_CLAIM
 
-from .models import Business, BusinessSettings, User
+from .models import Business, BusinessSettings, Role, User, UserRole
 from .services import (
     InvalidResetToken,
     confirm_password_reset,
@@ -32,7 +33,7 @@ INVALID_RESET_TOKEN = _("Reset link is invalid or expired.")
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "phone")
+        fields = ("id", "email", "first_name", "last_name", "phone", "must_change_password")
         read_only_fields = fields
 
 
@@ -151,6 +152,7 @@ class LoginSerializer(serializers.Serializer):
                 }
             )
 
+        update_last_login(None, user)
         return auth_payload(user, membership.business, membership.role.name)
 
 
@@ -218,3 +220,102 @@ class BusinessSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessSettings
         fields = ("low_stock_threshold", "expiry_warning_days", "tax_rate", "loyalty_enabled")
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"},
+        help_text="The temporary password, on first login.",
+    )
+    new_password = serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}
+    )
+
+
+# Staff management (UserRole rows of the active business)
+
+class StaffSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source="user.email", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
+    last_name = serializers.CharField(source="user.last_name", read_only=True)
+    phone = serializers.CharField(source="user.phone", read_only=True)
+    last_login = serializers.DateTimeField(source="user.last_login", read_only=True, allow_null=True)
+    role_name = serializers.CharField(source="role.name", read_only=True)
+    must_change_password = serializers.BooleanField(
+        source="user.must_change_password", read_only=True,
+        help_text="Still on a temporary password.",
+    )
+    is_you = serializers.SerializerMethodField()
+    can_manage = serializers.SerializerMethodField(
+        help_text="Whether the caller may change this person's role, access or password."
+    )
+
+    class Meta:
+        model = UserRole
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "phone",
+            "role",
+            "role_name",
+            "is_active",
+            "must_change_password",
+            "last_login",
+            "is_you",
+            "can_manage",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_is_you(self, membership) -> bool:
+        return membership.user_id == self.context["request"].user.pk
+
+    def get_can_manage(self, membership) -> bool:
+        return not self.get_is_you(membership) and membership.role_id in self.context["assignable_role_ids"]
+
+
+def _role_field(**kwargs):
+    # Scoped manager: another business's role is "does not exist".
+    return serializers.PrimaryKeyRelatedField(queryset=Role.objects.all(), **kwargs)
+
+
+def _temp_password_field(**kwargs):
+    return serializers.CharField(
+        write_only=True, trim_whitespace=False, style={"input_type": "password"}, **kwargs
+    )
+
+
+class StaffCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    first_name = serializers.CharField(max_length=150, allow_blank=True, default="")
+    last_name = serializers.CharField(max_length=150, allow_blank=True, default="")
+    phone = serializers.CharField(max_length=20, allow_blank=True, default="")
+    role = _role_field()
+    temp_password = _temp_password_field(help_text="They must change it at first login.")
+
+
+class StaffUpdateSerializer(serializers.Serializer):
+    role = _role_field(required=False)
+    is_active = serializers.BooleanField(required=False, help_text="False turns their access off.")
+
+
+class StaffPasswordResetSerializer(serializers.Serializer):
+    temp_password = _temp_password_field()
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+    assignable = serializers.SerializerMethodField(help_text="Whether the caller may give this role.")
+
+    class Meta:
+        model = Role
+        fields = ("id", "name", "is_system", "permissions", "assignable")
+        read_only_fields = fields
+
+    def get_permissions(self, role) -> list[str]:
+        return sorted(grant.permission.codename for grant in role.grants.all())
+
+    def get_assignable(self, role) -> bool:
+        return role.pk in self.context["assignable_role_ids"]

@@ -18,6 +18,7 @@ function renderShell() {
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(async () => {}),
+    changePassword: vi.fn(),
     can: () => true,
   }
   const router = createMemoryRouter(

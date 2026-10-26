@@ -1,6 +1,8 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from core.serializers import FinanceFieldsMixin
+
 from .models import Brand, Category, Product, Supplier
 
 
@@ -75,11 +77,12 @@ class RefSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
-class ProductSerializer(UniqueInBusinessMixin, serializers.ModelSerializer):
+class ProductSerializer(FinanceFieldsMixin, UniqueInBusinessMixin, serializers.ModelSerializer):
     """Read fields include derived stock (inventory.services.with_product_stock);
     the view always returns annotated instances."""
 
     unique_case_insensitive = ("sku", "barcode")
+    finance_fields = ("cost_price",)
 
     # Default querysets come from the scoped manager: another business's id
     # is rejected as "does not exist" (NFR-7).

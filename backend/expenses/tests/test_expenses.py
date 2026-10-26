@@ -263,11 +263,12 @@ class NetProfitTests(ExpensesAPITestCase):
         self.assertEqual(D(two_days["net_profit"]), D("-5000"))
 
     def test_expense_figures_need_the_expenses_permission(self):
-        seller = make_member(self.business_a, "seller@example.com", "Seller")
+        helper = make_member(self.business_a, "helper@example.com", "Helper")
         with tenant_context(self.business_a):
-            role = Role.objects.get(name="Seller")
-            RolePermission.objects.create(role=role, permission=Permission.objects.get(codename="sales.view"))
-        self.as_user(seller, self.business_a)
+            role = Role.objects.get(name="Helper")
+            for codename in ("sales.view", "sales.view_all", "finance.view"):
+                RolePermission.objects.create(role=role, permission=Permission.objects.get(codename=codename))
+        self.as_user(helper, self.business_a)
         summary = self.client.get(reverse("sales:summary")).data
         self.assertEqual(D(summary["gross_profit"]), D("8000"))
         self.assertIsNone(summary["expenses"])

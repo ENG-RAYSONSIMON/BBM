@@ -31,6 +31,12 @@ describe('SalesPage', () => {
     expect(screen.getAllByRole('link', { name: /New sale/ }).length).toBeGreaterThan(0)
   })
 
+  it("calls the list 'My sales' for a seller, who sees only their own", async () => {
+    mockFetch({ 'GET /sales/': { status: 200, body: EMPTY_PAGE } })
+    renderWithAuth('/sales', { '/sales': <SalesPage /> }, ['sales.view'])
+    expect(await screen.findByRole('heading', { name: 'My sales' })).toBeInTheDocument()
+  })
+
   it('shows an error with a retry button', async () => {
     mockFetch({ 'GET /sales/': { status: 500, body: null } })
     renderWithAuth('/sales', { '/sales': <SalesPage /> }, ['sales.view'])
@@ -50,7 +56,7 @@ describe('SaleDetailPage', () => {
       ],
       'POST /sales/s1/payments/': { status: 201, body: {} },
     })
-    renderWithAuth('/sales/s1', { '/sales/:id': <SaleDetailPage /> }, ['sales.view', 'sales.create'])
+    renderWithAuth('/sales/s1', { '/sales/:id': <SaleDetailPage /> }, ['sales.view', 'payments.create'])
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Record payment' }))
@@ -66,10 +72,27 @@ describe('SaleDetailPage', () => {
     expect(body).toEqual({ amount_received: '25000', note: '' })
   })
 
+  it('offers repayments only with payments.create', async () => {
+    mockFetch({ 'GET /sales/s1/': { status: 200, body: sale() } })
+    renderWithAuth('/sales/s1', { '/sales/:id': <SaleDetailPage /> }, ['sales.view', 'sales.create'])
+    expect(await screen.findByText('S-000007')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument()
+  })
+
+  it('shows cost and profit only when the server sends them', async () => {
+    const { cost_total: _cost, gross_profit: _profit, ...hidden } = sale()
+    mockFetch({ 'GET /sales/s1/': [{ status: 200, body: hidden }] })
+    renderWithAuth('/sales/s1', { '/sales/:id': <SaleDetailPage /> }, ['sales.view'])
+    expect(await screen.findByText('S-000007')).toBeInTheDocument()
+    expect(screen.queryByText('Gross profit')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cost of goods')).not.toBeInTheDocument()
+  })
+
   it('only offers void to roles with sales.void', async () => {
     mockFetch({ 'GET /sales/s1/': { status: 200, body: sale() } })
     renderWithAuth('/sales/s1', { '/sales/:id': <SaleDetailPage /> }, ['sales.view', 'sales.create'])
     expect(await screen.findByText('S-000007')).toBeInTheDocument()
+    expect(screen.getByText('Gross profit')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument()
   })
 

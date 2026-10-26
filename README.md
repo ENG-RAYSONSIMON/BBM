@@ -83,17 +83,24 @@ See `docs/PHASE_2_SUMMARY.md`.
   expiring and expired stock. `manage.py generate_notifications` (hourly in
   production) opens and resolves the alerts. Email, SMS and WhatsApp are
   reserved channels that fail visibly until Phase 5.
+- Step 4 done: staff accounts. The Owner (or an Admin) adds Sellers and
+  Cashiers at `/staff` with a temporary password, which they change at first
+  login. Sellers see only their own sales and no buying cost or profit.
+  Cashiers run the money path for the owner: all sales, credit payments,
+  products and stock, purchases and expenses, with costs and profit, but no
+  deletes, voids, reports, settings or staff. See `docs/PHASE_4_SUMMARY.md`,
+  step 4.
 
 **Languages: Kiswahili (default) and English.** A language button next to the
 theme button switches the whole app, including server error messages. See §7.
 
 **Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8, `docs/PHASE_2_SUMMARY.md` and
-`docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. no staff-management API yet;
-media served by Django in dev only; cash is the only payment method).
+`docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. media served by Django in dev
+only; cash is the only payment method).
 
 **Next:** Phase 4 is complete. Phase 5 (loyalty, 2FA and printed receipts,
-real SMS/WhatsApp) or the open known gaps (other payment methods, staff
-management, overselling override).
+real SMS/WhatsApp) or the open known gaps (other payment methods, a screen
+to edit role permissions, overselling override).
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -345,7 +352,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (255 tests)
+docker compose exec backend python manage.py test            # whole suite (282 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -364,7 +371,7 @@ docker compose exec backend python manage.py check
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (94 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, languages
+docker compose exec frontend npm test         # Vitest (110 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, staff, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
@@ -427,16 +434,21 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | POST | `/api/v1/auth/refresh/` | none | — |
 | POST | `/api/v1/auth/logout/` | Bearer | any member |
 | GET | `/api/v1/auth/me/` | Bearer | any member (also returns your `permissions`) |
+| POST | `/api/v1/auth/change-password/` | Bearer, 10/min per IP | any member (the only call allowed on a temporary password, with me/logout) |
+| GET/POST | `/api/v1/staff/` | Bearer | `staff.manage` |
+| GET/PATCH | `/api/v1/staff/{id}/` | Bearer | `staff.manage` (role, `is_active`; not yourself or the Owner) |
+| POST | `/api/v1/staff/{id}/reset-password/` | Bearer | `staff.manage` |
+| GET | `/api/v1/roles/` | Bearer | `staff.manage` (`assignable` = roles you may give) |
 | POST | `/api/v1/auth/password-reset/` | none, 5/hour per IP | — |
 | POST | `/api/v1/auth/password-reset/confirm/` | none, 5/hour per IP | — |
 | GET | `/api/v1/settings/` | Bearer | `settings.view` |
 | PATCH | `/api/v1/settings/` | Bearer | `settings.manage` |
-| GET | `/api/v1/sales/` | Bearer | `sales.view` |
+| GET | `/api/v1/sales/` | Bearer | `sales.view` (only your own sales without `sales.view_all`) |
 | POST | `/api/v1/sales/` | Bearer | `sales.create` |
-| GET | `/api/v1/sales/{id}/` | Bearer | `sales.view` |
-| POST | `/api/v1/sales/{id}/payments/` | Bearer | `sales.create` |
+| GET | `/api/v1/sales/{id}/` | Bearer | `sales.view` (cost and profit only with `finance.view`) |
+| POST | `/api/v1/sales/{id}/payments/` | Bearer | `payments.create` |
 | POST | `/api/v1/sales/{id}/void/` | Bearer | `sales.void` (Owner) |
-| GET | `/api/v1/sales/summary/` | Bearer | `sales.view` |
+| GET | `/api/v1/sales/summary/` | Bearer | `sales.view` + `sales.view_all` (profit only with `finance.view`) |
 | GET/POST/PATCH/DELETE | `/api/v1/customers/` … | Bearer | view / `sales.create` / `sales.void` to delete |
 | GET/POST, GET/PUT | `/api/v1/purchases/`, `/api/v1/purchases/{id}/` | Bearer | `purchases.view` / `purchases.manage` |
 | POST | `/api/v1/purchases/{id}/receive/`, `…/cancel/` | Bearer | `purchases.manage` |

@@ -45,6 +45,7 @@ export function renderWithAuth(
     login: async () => {},
     register: async () => {},
     logout: async () => {},
+    changePassword: async () => {},
     can: (permission) => permissions.includes(permission),
   }
   const router = createMemoryRouter(

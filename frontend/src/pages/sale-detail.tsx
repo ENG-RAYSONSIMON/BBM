@@ -87,7 +87,7 @@ export function SaleDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {!isVoid && owes && can(PERMISSIONS.salesCreate) && (
+          {!isVoid && owes && can(PERMISSIONS.paymentsCreate) && (
             <Button size="lg" onClick={() => setDialog('pay')}>
               <WalletIcon />
               {t('sales.recordPayment')}
@@ -168,7 +168,7 @@ export function SaleDetailPage() {
                   <dd className={strong ? 'text-right font-semibold tabular-nums' : 'text-right tabular-nums'}>{value}</dd>
                 </div>
               ))}
-              {!isVoid && (
+              {!isVoid && sale.cost_total !== undefined && sale.gross_profit !== undefined && (
                 <>
                   <dt className="text-muted-foreground border-t pt-2">{t('sales.costOfGoods')}</dt>
                   <dd className="border-t pt-2 text-right tabular-nums">{formatTZS(sale.cost_total)}</dd>

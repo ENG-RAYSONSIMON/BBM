@@ -126,7 +126,7 @@ function PurchaseEditor({ purchase }: { purchase?: PurchaseDetail }) {
           productName: product.name,
           tracksExpiry: product.tracks_expiry,
           quantity: '1',
-          unitCost: product.cost_price,
+          unitCost: product.cost_price ?? '',
           batchNumber: '',
           expiryDate: '',
         },
@@ -248,7 +248,7 @@ function PurchaseEditor({ purchase }: { purchase?: PurchaseDetail }) {
                       <p className="truncate font-medium">{product.name}</p>
                       <p className="text-muted-foreground text-sm">
                         {t('purchases.costInStock', {
-                          cost: formatTZS(product.cost_price),
+                          cost: product.cost_price === undefined ? '—' : formatTZS(product.cost_price),
                           count: product.stock_on_hand,
                           unit: product.unit,
                         })}

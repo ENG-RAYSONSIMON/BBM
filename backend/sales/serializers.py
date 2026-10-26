@@ -2,6 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from catalog.models import Product
+from core.serializers import FinanceFieldsMixin
 
 from .models import Customer, Payment, Sale, SaleItem, SaleItemAllocation
 
@@ -135,7 +136,9 @@ class AllocationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class SaleItemSerializer(serializers.ModelSerializer):
+class SaleItemSerializer(FinanceFieldsMixin, serializers.ModelSerializer):
+    finance_fields = ("unit_cost", "line_cost")
+
     product_name = serializers.CharField(source="product.name", read_only=True)
     allocations = AllocationSerializer(many=True, read_only=True)
 
@@ -156,8 +159,11 @@ class SaleItemSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class SaleSerializer(serializers.ModelSerializer):
-    """List view of a sale, with derived payment totals."""
+class SaleSerializer(FinanceFieldsMixin, serializers.ModelSerializer):
+    """List view of a sale, with derived payment totals. Cost and profit are
+    left out without finance.view."""
+
+    finance_fields = ("cost_total", "gross_profit")
 
     receipt_number = serializers.CharField(read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True, default=None)
@@ -226,8 +232,12 @@ class SalesSummarySerializer(serializers.Serializer):
     sales_count = serializers.IntegerField()
     revenue = serializers.DecimalField(**MONEY)
     discounts = serializers.DecimalField(**MONEY)
-    cogs = serializers.DecimalField(**MONEY)
-    gross_profit = serializers.DecimalField(**MONEY)
+    cogs = serializers.DecimalField(
+        **MONEY, allow_null=True, help_text="Null without the finance.view permission."
+    )
+    gross_profit = serializers.DecimalField(
+        **MONEY, allow_null=True, help_text="Null without the finance.view permission."
+    )
     cash_collected = serializers.DecimalField(**MONEY, help_text="Payments − refunds in the range.")
     outstanding_credit = serializers.DecimalField(**MONEY, help_text="Still owed on all sales, all time.")
     expenses = serializers.DecimalField(
@@ -236,5 +246,5 @@ class SalesSummarySerializer(serializers.Serializer):
     )
     net_profit = serializers.DecimalField(
         **MONEY, allow_null=True,
-        help_text="Gross profit − expenses. Null without the expenses.view permission.",
+        help_text="Gross profit − expenses. Null without both expenses.view and finance.view.",
     )

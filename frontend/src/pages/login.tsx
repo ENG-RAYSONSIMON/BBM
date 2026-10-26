@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
 import { AuthLayout } from '@/components/layout/auth-layout'
+import { PasswordField } from '@/components/password-field'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -100,9 +101,8 @@ export function LoginPage() {
           {...form.register('email')}
         />
         <div className="grid gap-1.5">
-          <FormField
+          <PasswordField
             label={t('auth.password')}
-            type="password"
             autoComplete="current-password"
             error={errors.password?.message}
             {...form.register('password')}

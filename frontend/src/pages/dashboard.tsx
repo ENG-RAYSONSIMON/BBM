@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth-context'
 import { periodRange } from '@/lib/dates'
 import type { Period } from '@/lib/dates'
 import { formatTZS } from '@/lib/format'
+import { roleLabel } from '@/lib/roles'
 import { PERMISSIONS } from '@/lib/types'
 import type { InventorySummary, SalesSummary } from '@/lib/types'
 import { toQuery } from '@/lib/use-list-params'
@@ -40,7 +41,9 @@ export function DashboardPage() {
   const { me, can } = useAuth()
   const { t } = useTranslation()
   const canSeeStock = can(PERMISSIONS.inventoryView)
-  const canSeeSales = can(PERMISSIONS.salesView)
+  // The totals cover everyone's sales; a seller sees only their own sales list.
+  const canSeeSales = can(PERMISSIONS.salesViewAll)
+  const canSeeProfit = can(PERMISSIONS.financeView)
   const canSeeExpenses = can(PERMISSIONS.expensesView)
   const [period, setPeriod] = useState<Period>('today')
   // FR-17: figures for the chosen period, straight from live queries.
@@ -64,7 +67,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.welcome', { name })}</h1>
         <p className="text-muted-foreground">
-          {me.business.name} · {me.role}
+          {me.business.name} · {roleLabel(t, me.role)}
         </p>
       </div>
 
@@ -100,15 +103,17 @@ export function DashboardPage() {
                   ? t(period === 'today' ? 'dashboard.noSalesToday' : 'dashboard.noSalesPeriod')
                   : t('dashboard.salesCount', { count: sales.data.sales_count }))}
             </Tile>
-            <Tile
-              label={t(`dashboard.grossProfit_${period}`)}
-              icon={TrendingUpIcon}
-              value={sales.data && formatTZS(sales.data.gross_profit)}
-              loading={sales.isPending}
-              error={sales.isError}
-            >
-              {sales.data && t('dashboard.grossProfitHint', { cogs: formatTZS(sales.data.cogs) })}
-            </Tile>
+            {canSeeProfit && (
+              <Tile
+                label={t(`dashboard.grossProfit_${period}`)}
+                icon={TrendingUpIcon}
+                value={sales.data?.gross_profit == null ? undefined : formatTZS(sales.data.gross_profit)}
+                loading={sales.isPending}
+                error={sales.isError}
+              >
+                {sales.data?.cogs != null && t('dashboard.grossProfitHint', { cogs: formatTZS(sales.data.cogs) })}
+              </Tile>
+            )}
             {canSeeExpenses && (
               <>
                 <Tile
@@ -121,15 +126,17 @@ export function DashboardPage() {
                 >
                   {t('dashboard.expensesHint')}
                 </Tile>
-                <Tile
-                  label={t(`dashboard.netProfit_${period}`)}
-                  icon={CoinsIcon}
-                  value={sales.data?.net_profit == null ? undefined : formatTZS(sales.data.net_profit)}
-                  loading={sales.isPending}
-                  error={sales.isError}
-                >
-                  {t('dashboard.netProfitHint')}
-                </Tile>
+                {canSeeProfit && (
+                  <Tile
+                    label={t(`dashboard.netProfit_${period}`)}
+                    icon={CoinsIcon}
+                    value={sales.data?.net_profit == null ? undefined : formatTZS(sales.data.net_profit)}
+                    loading={sales.isPending}
+                    error={sales.isError}
+                  >
+                    {t('dashboard.netProfitHint')}
+                  </Tile>
+                )}
               </>
             )}
             <Tile

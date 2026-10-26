@@ -7,7 +7,7 @@ import i18n from '@/i18n'
 
 import { api, ApiError, onAuthLost, tokenStore } from './api'
 import { AuthContext } from './auth-context'
-import type { AuthContextValue, AuthStatus, LoginInput, RegisterInput } from './auth-context'
+import type { AuthContextValue, AuthStatus, ChangePasswordInput, LoginInput, RegisterInput } from './auth-context'
 import type { AuthPayload, Me } from './types'
 
 const ME_QUERY_KEY = ['me'] as const
@@ -74,6 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [startSession],
   )
 
+  const changePassword = useCallback(
+    async (input: ChangePasswordInput) => {
+      await startSession(await api<AuthPayload>('/auth/change-password/', { method: 'POST', body: input }))
+    },
+    [startSession],
+  )
+
   const logout = useCallback(async () => {
     const refresh = tokenStore.getRefresh()
     if (refresh) {
@@ -100,9 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      changePassword,
       can: (permission) => me?.permissions.includes(permission) ?? false,
     }),
-    [status, me, meQuery, login, register, logout],
+    [status, me, meQuery, login, register, logout, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

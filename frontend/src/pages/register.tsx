@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { FormError } from '@/components/form-error'
 import { FormField } from '@/components/form-field'
 import { AuthLayout } from '@/components/layout/auth-layout'
+import { PasswordField } from '@/components/password-field'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { applyServerErrors } from '@/lib/forms'
@@ -104,17 +105,15 @@ export function RegisterPage() {
           error={errors.email?.message}
           {...form.register('email')}
         />
-        <FormField
+        <PasswordField
           label={t('auth.password')}
-          type="password"
           autoComplete="new-password"
           hint={t('auth.passwordHint')}
           error={errors.password?.message}
           {...form.register('password')}
         />
-        <FormField
+        <PasswordField
           label={t('auth.confirmPassword')}
-          type="password"
           autoComplete="new-password"
           error={errors.confirm_password?.message}
           {...form.register('confirm_password')}

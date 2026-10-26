@@ -29,6 +29,10 @@ EXPENSES_DELETE = "expenses.delete"
 AUDIT_VIEW = "audit.view"
 REPORTS_VIEW = "reports.view"
 REPORTS_EXPORT = "reports.export"
+SALES_VIEW_ALL = "sales.view_all"
+PAYMENTS_CREATE = "payments.create"
+FINANCE_VIEW = "finance.view"
+STAFF_MANAGE = "staff.manage"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
@@ -38,8 +42,8 @@ PERMISSIONS = {
     CATALOG_DELETE: "Delete products, categories, brands and suppliers.",
     INVENTORY_VIEW: "View stock levels, batches, movements and alerts.",
     INVENTORY_ADJUST: "Record stock adjustments and manage batches.",
-    SALES_VIEW: "View sales, payments, customers and sales totals.",
-    SALES_CREATE: "Record sales and customer payments, and manage customers.",
+    SALES_VIEW: "View sales, payments and customers (only your own sales without sales.view_all).",
+    SALES_CREATE: "Record sales and manage customers.",
     SALES_VOID: "Void a sale, returning its stock and refunding its payments.",
     PURCHASES_VIEW: "View purchases from suppliers.",
     PURCHASES_MANAGE: "Create, edit, receive and cancel purchases.",
@@ -49,7 +53,13 @@ PERMISSIONS = {
     AUDIT_VIEW: "View the audit log of sensitive actions.",
     REPORTS_VIEW: "View sales, profit, expense, stock-valuation and expiry reports.",
     REPORTS_EXPORT: "Download reports as CSV.",
+    SALES_VIEW_ALL: "View everyone's sales and the sales totals.",
+    PAYMENTS_CREATE: "Record customer payments towards credit sales.",
+    FINANCE_VIEW: "View buying costs and profit.",
+    STAFF_MANAGE: "Add staff, change their roles, turn them off and reset their passwords.",
 }
+
+SELLER_PERMISSIONS = frozenset({CATALOG_VIEW, INVENTORY_VIEW, SALES_VIEW, SALES_CREATE})
 
 DEFAULT_ROLE_PERMISSIONS = {
     Role.OWNER: frozenset(PERMISSIONS),
@@ -70,6 +80,29 @@ DEFAULT_ROLE_PERMISSIONS = {
             EXPENSES_MANAGE,
             REPORTS_VIEW,
             REPORTS_EXPORT,
+            SALES_VIEW_ALL,
+            PAYMENTS_CREATE,
+            FINANCE_VIEW,
+            STAFF_MANAGE,
         }
     ),
+    # Sellers sell and see stock; they see only their own sales and never
+    # buying costs or profit.
+    Role.SELLER: SELLER_PERMISSIONS,
+    # The cashier runs the shop's money path for an owner who may be far
+    # away: sales and repayments, products and stock, purchases and expenses,
+    # with buying costs and profit. Never deletes or voids, and has no
+    # reports, settings or staff (so it stays below Admin).
+    Role.CASHIER: SELLER_PERMISSIONS
+    | {
+        SALES_VIEW_ALL,
+        PAYMENTS_CREATE,
+        FINANCE_VIEW,
+        CATALOG_MANAGE,
+        INVENTORY_ADJUST,
+        PURCHASES_VIEW,
+        PURCHASES_MANAGE,
+        EXPENSES_VIEW,
+        EXPENSES_MANAGE,
+    },
 }

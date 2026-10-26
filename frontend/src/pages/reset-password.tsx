@@ -6,8 +6,8 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 
 import { FormError } from '@/components/form-error'
-import { FormField } from '@/components/form-field'
 import { AuthLayout } from '@/components/layout/auth-layout'
+import { PasswordField } from '@/components/password-field'
 import { Button } from '@/components/ui/button'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -71,17 +71,15 @@ export function ResetPasswordPage() {
     <AuthLayout title={t('auth.newPasswordTitle')} footer={requestAgain}>
       <form className="grid gap-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         <FormError message={errors.root?.server?.message} />
-        <FormField
+        <PasswordField
           label={t('auth.newPassword')}
-          type="password"
           autoComplete="new-password"
           hint={t('auth.passwordHint')}
           error={errors.new_password?.message}
           {...form.register('new_password')}
         />
-        <FormField
+        <PasswordField
           label={t('auth.confirmNewPassword')}
-          type="password"
           autoComplete="new-password"
           error={errors.confirm_password?.message}
           {...form.register('confirm_password')}

@@ -17,6 +17,11 @@ class User(UUIDModel, TimeStampedModel, AbstractUser):
     username = None
     email = models.EmailField("email address", unique=True)
     phone = models.CharField(max_length=20, blank=True)
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="Set when an owner gives a temporary password; the API refuses "
+        "everything except choosing a new one until it is changed.",
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -73,6 +78,8 @@ class ProtectedRoleError(ValidationError):
 class Role(TenantModel):
     OWNER = "Owner"
     ADMIN = "Admin"
+    SELLER = "Seller"
+    CASHIER = "Cashier"
 
     name = models.CharField(max_length=50)
     is_system = models.BooleanField(

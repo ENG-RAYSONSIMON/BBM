@@ -23,6 +23,19 @@ describe('SidebarContent', () => {
     expect(nav).not.toHaveTextContent('Audit log')
   })
 
+  it('shows staff only with staff.manage, and everyone their password link', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['sales.view'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(nav).not.toHaveTextContent('Staff')
+    expect(screen.getByRole('link', { name: 'My password' })).toHaveAttribute('href', '/change-password')
+  })
+
+  it('shows the staff link with staff.manage', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['staff.manage'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(nav).toHaveTextContent('Staff')
+  })
+
   it('shows the audit log only with audit.view', async () => {
     renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['audit.view'])
     const nav = await screen.findByRole('navigation', { name: 'Main' })

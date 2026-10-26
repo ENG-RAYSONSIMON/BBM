@@ -45,26 +45,26 @@ class TenantScopingTests(TestCase):
 
     def test_bulk_update_is_scoped(self):
         with tenant_context(self.business_a):
-            self.assertEqual(Role.objects.update(is_system=False), 2)  # Owner + Admin
+            self.assertEqual(Role.objects.update(is_system=False), 4)  # Owner, Admin, Seller, Cashier
         self.role_b.refresh_from_db()
         self.assertTrue(self.role_b.is_system)
 
     def test_all_objects_is_unscoped(self):
-        self.assertEqual(Role.all_objects.count(), 4)  # Owner + Admin per business
+        self.assertEqual(Role.all_objects.count(), 8)  # Owner, Admin, Seller, Cashier per business
 
     def test_save_assigns_active_business(self):
         with tenant_context(self.business_a):
-            role = Role.objects.create(name="Cashier")
+            role = Role.objects.create(name="Helper")
         self.assertEqual(role.business_id, self.business_a.pk)
 
     def test_save_without_active_business_fails(self):
         with self.assertRaises(TenantContextMissing):
-            Role(name="Cashier").save()
+            Role(name="Helper").save()
 
     def test_save_into_another_business_is_rejected(self):
         with tenant_context(self.business_a):
             with self.assertRaises(TenantMismatch):
-                Role(name="Cashier", business=self.business_b).save()
+                Role(name="Helper", business=self.business_b).save()
 
     def test_user_role_cannot_use_role_from_another_business(self):
         user = User.objects.get(email="a@example.com")

@@ -6,6 +6,7 @@ from rest_framework.test import APIRequestFactory, APITestCase, force_authentica
 from rest_framework.views import APIView
 
 from accounts.models import (
+    Business,
     BusinessSettings,
     Permission,
     ProtectedRoleError,
@@ -90,7 +91,7 @@ class PermissionTests(APITestCase):
     def test_new_role_needs_no_code_change(self):
         cashier = User.objects.create_user(email="cashier@example.com", password=PASSWORD)
         with tenant_context(self.business):
-            role = Role.objects.create(name="Cashier")
+            role = Role.objects.create(name="Helper")
             UserRole.objects.create(user=cashier, role=role)
         self.as_user(cashier)
 
@@ -181,7 +182,7 @@ class PermissionTests(APITestCase):
                 self.admin_role.delete()
             with self.assertRaises(ProtectedRoleError), transaction.atomic():
                 Role.objects.filter(is_system=True).delete()
-            self.assertEqual(Role.objects.filter(is_system=True).count(), 2)
+            self.assertEqual(Role.objects.filter(is_system=True).count(), 4)
 
     def test_owner_grants_cannot_be_removed(self):
         with tenant_context(self.business):
@@ -194,12 +195,12 @@ class PermissionTests(APITestCase):
 
     def test_custom_roles_can_be_renamed_and_deleted(self):
         with tenant_context(self.business):
-            role = Role.objects.create(name="Cashier")
+            role = Role.objects.create(name="Helper")
             self.grant(role, SETTINGS_VIEW)
             role.name = "Till"
             role.save()
             role.delete()
-            self.assertFalse(Role.objects.filter(name__in=["Cashier", "Till"]).exists())
+            self.assertFalse(Role.objects.filter(name__in=["Helper", "Till"]).exists())
 
 
 class UndeclaredView(APIView):
@@ -215,3 +216,58 @@ class HasTenantPermissionConfigTests(APITestCase):
         force_authenticate(request, user=User(email="x@example.com"))
         with self.assertRaises(ImproperlyConfigured):
             UndeclaredView.as_view()(request)
+
+
+class StaffRolesMigrationTests(APITestCase):
+    """0009 gives businesses that existed before it the Seller and Cashier
+    roles and the new Owner/Admin grants, and leaves a same-named custom role alone."""
+
+    def test_seeds_roles_for_existing_businesses(self):
+        from importlib import import_module
+
+        from django.apps import apps
+
+        migration = import_module("accounts.migrations.0009_staff_roles_permissions")
+        business = Business.objects.create(name="Old Shop")
+        with tenant_context(business):
+            Role.objects.create(name=Role.OWNER, is_system=True)
+            Role.objects.create(name=Role.SELLER)  # the shop's own, no grants
+            migration.seed(apps, None)
+            grants = {
+                role.name: set(role.grants.values_list("permission__codename", flat=True))
+                for role in Role.objects.all()
+            }
+            seller = Role.objects.get(name=Role.SELLER)
+        self.assertEqual(grants[Role.CASHIER], set(migration.NEW_ROLES[Role.CASHIER]))
+        self.assertEqual(grants[Role.OWNER], set(migration.NEW))
+        self.assertFalse(seller.is_system)
+        self.assertEqual(grants[Role.SELLER], set())
+
+
+class CashierMigrationTests(APITestCase):
+    """0011 gives existing system Cashier roles the money-path grants and
+    leaves a business's own role named Cashier alone."""
+
+    def test_grants_existing_cashiers(self):
+        from importlib import import_module
+
+        from django.apps import apps
+
+        migration = import_module("accounts.migrations.0011_cashier_runs_the_shop")
+        system = Business.objects.create(name="Old Shop")
+        custom = Business.objects.create(name="Own Roles Shop")
+        with tenant_context(system):
+            old_cashier = Role.objects.create(name=Role.CASHIER, is_system=True)
+        with tenant_context(custom):
+            own_cashier = Role.objects.create(name=Role.CASHIER)
+        # The live models' managers are tenant-scoped, so run it per business.
+        for business in (system, custom):
+            with tenant_context(business):
+                migration.grant(apps, None)
+
+        def codenames(role):
+            return set(RolePermission.all_objects.filter(role=role).values_list("permission__codename", flat=True))
+
+        self.assertEqual(codenames(old_cashier), set(migration.NEW))
+        self.assertEqual(codenames(own_cashier), set())
+        self.assertLess(set(DEFAULT_ROLE_PERMISSIONS[Role.CASHIER]), set(DEFAULT_ROLE_PERMISSIONS[Role.ADMIN]))

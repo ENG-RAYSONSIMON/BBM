@@ -12,8 +12,16 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.models import User, UserRole
-from accounts.rbac import EXPENSES_VIEW, SALES_CREATE, SALES_VIEW, SALES_VOID
-from accounts.services import get_permission_codenames
+from accounts.rbac import (
+    EXPENSES_VIEW,
+    FINANCE_VIEW,
+    PAYMENTS_CREATE,
+    SALES_CREATE,
+    SALES_VIEW,
+    SALES_VIEW_ALL,
+    SALES_VOID,
+)
+from core.permissions import has_permission
 from core.views import TenantModelViewSet
 
 from .models import Customer, Sale
@@ -57,14 +65,23 @@ def _service_call(fn, **kwargs):
         raise ValidationError({"non_field_errors": exc.messages})
 
 
-def _sale_queryset():
+def _visible_sales(request):
+    """The business's sales, or only the caller's own without sales.view_all.
+    Someone else's sale is then a 404, like another business's."""
+    sales = Sale.objects.all()
+    if not has_permission(request, SALES_VIEW_ALL):
+        sales = sales.filter(sold_by=request.user)
+    return sales
+
+
+def _sale_queryset(request):
     return with_payment_totals(
-        Sale.objects.select_related("customer", "sold_by", "voided_by")
+        _visible_sales(request).select_related("customer", "sold_by", "voided_by")
     )
 
 
 def _sale_detail(pk, context):
-    sale = _sale_queryset().prefetch_related(
+    sale = _sale_queryset(context["request"]).prefetch_related(
         "items__product", "items__allocations__batch", "payments__received_by"
     ).get(pk=pk)
     return SaleDetailSerializer(sale, context=context).data
@@ -124,7 +141,9 @@ class SaleViewSet(
     ordering = ("-created_at",)
 
     def get_queryset(self):
-        return _sale_queryset()
+        if getattr(self, "swagger_fake_view", False):  # schema generation: no caller
+            return Sale.objects.none()
+        return _sale_queryset(self.request)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -159,7 +178,7 @@ class SaleActionView(generics.GenericAPIView):
     """Base for POST actions on one sale; another business's sale is a 404."""
 
     def get_queryset(self):
-        return Sale.objects.all()
+        return _visible_sales(self.request)
 
     def get_sale(self):
         return get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
@@ -173,7 +192,7 @@ class SaleActionView(generics.GenericAPIView):
 )
 class SalePaymentView(SaleActionView):
     serializer_class = PaymentCreateSerializer
-    required_permissions = (SALES_CREATE,)
+    required_permissions = (PAYMENTS_CREATE,)
 
     def post(self, request, pk):
         sale = self.get_sale()
@@ -217,7 +236,7 @@ class SalesSummaryView(generics.GenericAPIView):
     """FR-16/FR-17 dashboard figures, including net profit."""
 
     serializer_class = SalesSummarySerializer
-    required_permissions = (SALES_VIEW,)
+    required_permissions = (SALES_VIEW, SALES_VIEW_ALL)
 
     def get(self, request):
         date_from = self._date("date_from", timezone.localdate())
@@ -225,9 +244,12 @@ class SalesSummaryView(generics.GenericAPIView):
         if date_to < date_from:
             raise ValidationError({"date_to": [_("The end date is before the start date.")]})
         summary = sales_summary(date_from, date_to)
-        # Expense figures follow the expenses permission, not the sales one.
-        if EXPENSES_VIEW not in get_permission_codenames(request.membership):
+        # Expense figures follow the expenses permission, profit the finance
+        # one, not the sales one.
+        if not has_permission(request, EXPENSES_VIEW):
             summary["expenses"] = summary["net_profit"] = None
+        if not has_permission(request, FINANCE_VIEW):
+            summary["cogs"] = summary["gross_profit"] = summary["net_profit"] = None
         return Response(SalesSummarySerializer(summary).data)
 
     def _date(self, name, default):

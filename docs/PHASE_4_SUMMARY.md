@@ -36,7 +36,7 @@ Decisions taken with the product owner:
 | `EXPENSE_CHANGE` | `ExpenseViewSet.perform_update` (changed fields only), receipt PUT/DELETE in `ExpenseReceiptView`. |
 | `SALE_VOID` | `sales.services.void_sale` (reason, amount refunded). |
 | `PURCHASE_CANCEL` | `purchases.services.cancel_purchase` (reason). |
-| `ROLE_CHANGE` | Django admin edits/deletes of `Role`, `RolePermission`, `UserRole` (`accounts.admin.RoleChangeAuditMixin`). There is no staff/roles API yet; when one is built it calls `record()` the same way. |
+| `ROLE_CHANGE` | Django admin edits/deletes of `Role`, `RolePermission`, `UserRole` (`accounts.admin.RoleChangeAuditMixin`). Staff changes made in the app are logged as `STAFF_ADD`, `STAFF_CHANGE` and `STAFF_PASSWORD_RESET` (step 4). |
 | `EXPORT` | Reserved for step 2 CSV downloads. |
 
 ## 3. Permission and API
@@ -163,3 +163,66 @@ Decisions:
 - [ ] No notifications other than stock ones yet (e.g. a customer's credit overdue).
 - [ ] The scheduler has no healthcheck; a run that keeps failing shows only in its logs.
 - [ ] Old resolved notifications are never cleaned up.
+
+---
+
+# Step 4: staff accounts (Sellers and Cashiers)
+
+Status as of 2026-10-26: implemented, not yet committed.
+- Backend: 282 tests (255 after step 3, 27 new). The schema validates with `--fail-on-warn`.
+- Frontend: 110 Vitest tests (16 new, including the show-password eye).
+
+Decisions taken with the product owner:
+- **Email + temporary password.** The Owner (or an Admin) sets it when adding someone; they must choose their own at first login.
+- **Fixed roles for now:** Seller and Cashier join Owner and Admin as system roles. There is no screen to edit what a role may do yet.
+- **Cost and profit hidden** from anyone without `finance.view`, enforced by the server.
+- **The Cashier runs the money path** for an owner who may be far away: sales and repayments, products and stock, purchases and expenses, with buying prices and profit. Never deletes or voids; no reports, settings, staff or audit log. Migration `accounts/0011_cashier_runs_the_shop` gives existing Cashier roles the extra grants.
+- **Only new emails.** The plan let an email that already had an account (e.g. from another shop) join with its own password. The tenancy review found that this lets a shop take over that account here: a shop that created an account knows, or has reset, its password. With no email verification, nothing proves an existing account belongs to the person being added, so the staff API refuses existing emails. A person who works at two shops needs two emails for now (or Django admin).
+
+## S4.1 Roles and permissions
+
+New codenames (`accounts/rbac.py`, migration `accounts/0009_staff_roles_permissions`, which also creates Seller and Cashier in every existing business):
+
+| Codename | Means | Owner | Admin | Cashier | Seller |
+|---|---|---|---|---|---|
+| `sales.view_all` | everyone's sales and the sales totals | ✓ | ✓ | ✓ | – |
+| `payments.create` | credit repayments (split out of `sales.create`) | ✓ | ✓ | ✓ | – |
+| `finance.view` | buying cost and profit | ✓ | ✓ | ✓ | – |
+| `staff.manage` | add and manage staff | ✓ | ✓ | – | – |
+
+Seller: `catalog.view`, `inventory.view`, `sales.view`, `sales.create`. Cashier: the same plus `sales.view_all`, `payments.create`, `finance.view`, `catalog.manage`, `inventory.adjust`, `purchases.view`/`manage` and `expenses.view`/`manage`. It holds no `.delete`, `sales.void`, `reports.*`, `settings.*`, `staff.manage` or `audit.view`, so it stays below Admin and an Admin can still add Cashiers.
+
+- Without `sales.view_all` the sale list, detail, payment and void views only see the caller's own sales (others are 404), and `/sales/summary/` is 403.
+- Without `finance.view`, `core.serializers.FinanceFieldsMixin` leaves out product `cost_price`, sale `cost_total` / `gross_profit` and item `unit_cost` / `line_cost`. The summary returns `cogs`, `gross_profit` and `net_profit` as null.
+- **Who may give which role:** only a role with *fewer* powers than your own (its permissions a strict subset of yours). So an Admin can add Sellers and Cashiers but not Admins, and nobody can give Owner or change the Owner (Owner holds every permission). Nobody can change themselves. This reads permission rows, not role names.
+
+## S4.2 Accounts and the API
+
+- `User.must_change_password` (migration `0010`). While it is set, `HasTenantPermission` answers 403 (`password_change_required`) on every view except me, logout and change-password. A reset by email also clears it.
+- Login now records `last_login` (shown on the staff list).
+
+| Method | Path | Does |
+|---|---|---|
+| GET/POST | `/api/v1/staff/` | List; add someone: creates an account with the temporary password. An email that already has an account is refused (400). |
+| GET/PATCH | `/api/v1/staff/{id}/` | Change role or `is_active`. Turning off works from their next request; their sales stay. No delete. |
+| POST | `/api/v1/staff/{id}/reset-password/` | New temporary password, logs them out everywhere. Refused if the account also belongs to another business (possible only via Django admin), and for platform operators (`is_staff`/`is_superuser`). |
+| GET | `/api/v1/roles/` | Roles, with `assignable` for the caller. |
+| POST | `/api/v1/auth/change-password/` | Current + new password; ends other sessions, returns fresh tokens. |
+
+Ids are membership (`UserRole`) ids, so another business's staff are 404. Each add, change and reset writes an audit entry in the same transaction.
+
+## S4.3 Frontend
+
+- `/staff` (sidebar "Staff" / "Wafanyakazi", with `staff.manage`): list with role, status, temporary-password badge and last login; Add dialog with "Make one for me" and "Copy login details" (text ready for WhatsApp/SMS); a dialog to change role, turn access off/on or give a new password.
+- `/change-password`: forced after login on a temporary password (route guard), and reachable any time from "My password" in the sidebar footer.
+- Role names are translated (Mmiliki, Msimamizi, Muuzaji, Keshia).
+- Dashboard: sales tiles need `sales.view_all`, profit tiles `finance.view`. Sales list is titled "My sales" without `sales.view_all`. Cost and profit rows show only when the server sends them.
+
+## S4.4 Known gaps
+
+- [ ] No screen to edit what each role may do (the tables allow it; Django admin only).
+- [ ] One account can't work at two shops through the app; that needs an email invite the person accepts.
+- [ ] A staff member's name and phone can't be edited after adding (the account may be shared with another business).
+- [ ] A seller's dashboard has no "my sales today" tile yet.
+- [ ] The reports permission still shows profit to any role holding it, regardless of `finance.view` (only Owner and Admin have it by default).
+

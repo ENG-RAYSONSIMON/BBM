@@ -13,6 +13,7 @@ export type RegisterInput = {
   last_name?: string
   phone?: string
 }
+export type ChangePasswordInput = { current_password: string; new_password: string }
 
 export type AuthContextValue = {
   status: AuthStatus
@@ -22,6 +23,8 @@ export type AuthContextValue = {
   login: (input: LoginInput) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
   logout: () => Promise<void>
+  /** Change my password; the server ends other sessions and issues new tokens. */
+  changePassword: (input: ChangePasswordInput) => Promise<void>
   can: (permission: string) => boolean
 }
 

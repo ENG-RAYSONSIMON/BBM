@@ -79,7 +79,12 @@ export function SalesPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-4">
-      <PageHeader title={t('sales.title')} description={t('sales.subtitle')} actions={sellButton} />
+      {/* Without sales.view_all the server lists only the caller's own sales. */}
+      {can(PERMISSIONS.salesViewAll) ? (
+        <PageHeader title={t('sales.title')} description={t('sales.subtitle')} actions={sellButton} />
+      ) : (
+        <PageHeader title={t('sales.titleMine')} description={t('sales.subtitleMine')} actions={sellButton} />
+      )}
 
       {filters.customer && (
         <div className="flex items-center gap-2 text-sm">

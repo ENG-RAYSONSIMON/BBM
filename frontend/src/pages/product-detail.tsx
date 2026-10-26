@@ -89,7 +89,8 @@ export function ProductDetailPage() {
   const batches = batchesQuery.data?.results ?? []
   const facts: [string, string][] = [
     [t('products.sellingPrice'), formatTZS(product.selling_price)],
-    [t('products.costPrice'), formatTZS(product.cost_price)],
+    // Buying cost is left out for roles without finance.view.
+    ...(product.cost_price === undefined ? [] : [[t('products.costPrice'), formatTZS(product.cost_price)] as [string, string]]),
     [t('products.sku'), product.sku || '—'],
     [t('products.barcode'), product.barcode || '—'],
     [t('common.category'), product.category_detail?.name ?? '—'],

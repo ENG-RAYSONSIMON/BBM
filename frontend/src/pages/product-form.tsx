@@ -52,7 +52,7 @@ function toFormValues(product: Product): ProductFormInput {
     brand: product.brand ?? '',
     supplier: product.supplier ?? '',
     selling_price: product.selling_price,
-    cost_price: product.cost_price,
+    cost_price: product.cost_price ?? '',
     reorder_level: product.reorder_level === null ? '' : String(product.reorder_level),
     tracks_expiry: product.tracks_expiry,
   }

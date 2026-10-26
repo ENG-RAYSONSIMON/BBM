@@ -1,7 +1,9 @@
 from django.urls import path
+from rest_framework.routers import SimpleRouter
 
 from .views import (
     BusinessSettingsView,
+    ChangePasswordView,
     LoginView,
     LogoutView,
     MeView,
@@ -9,9 +11,14 @@ from .views import (
     PasswordResetRequestView,
     RefreshView,
     RegisterView,
+    RoleListView,
+    StaffViewSet,
 )
 
 app_name = "accounts"
+
+router = SimpleRouter()
+router.register("staff", StaffViewSet, basename="staff")
 
 urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="register"),
@@ -25,5 +32,8 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password-reset-confirm",
     ),
+    path("auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("settings/", BusinessSettingsView.as_view(), name="settings"),
+    path("roles/", RoleListView.as_view(), name="role-list"),
+    *router.urls,
 ]

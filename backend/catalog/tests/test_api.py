@@ -72,13 +72,13 @@ class CategoryAPITests(TenantAPITestCase):
         self.assertIn("products", response.data["detail"])
 
     def test_role_without_catalog_grants_is_forbidden(self):
-        cashier = make_member(self.business_a, "cashier@example.com", "Cashier")
+        cashier = make_member(self.business_a, "helper@example.com", "Helper")
         self.as_user(cashier, self.business_a)
         self.assertEqual(self.client.get(CATEGORIES).status_code, 403)
 
         with tenant_context(self.business_a):
             RolePermission.objects.create(
-                role=Role.objects.get(name="Cashier"),
+                role=Role.objects.get(name="Helper"),
                 permission=Permission.objects.get(codename=CATALOG_VIEW),
             )
         self.assertEqual(self.client.get(CATEGORIES).status_code, 200)

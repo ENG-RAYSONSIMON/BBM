@@ -39,7 +39,7 @@ export function mockFetch(routes: Record<string, Handler | Handler[]>) {
 }
 
 export const ME = {
-  user: { id: 'u1', email: 'owner@example.com', first_name: 'Amina', last_name: '', phone: '' },
+  user: { id: 'u1', email: 'owner@example.com', first_name: 'Amina', last_name: '', phone: '', must_change_password: false },
   business: {
     id: 'b1',
     name: 'Glow Cosmetics',
