@@ -13,6 +13,13 @@ describe('SidebarContent', () => {
     expect(nav).toHaveTextContent('Settings')
     expect(nav).not.toHaveTextContent('Products')
     expect(nav).not.toHaveTextContent('Inventory alerts')
+    expect(nav).not.toHaveTextContent('Audit log')
+  })
+
+  it('shows the audit log only with audit.view', async () => {
+    renderWithAuth('/sidebar', { '/sidebar': <SidebarContent /> }, ['audit.view'])
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(nav).toHaveTextContent('Audit log')
   })
 
   it('shows catalog and inventory links with their permissions', async () => {

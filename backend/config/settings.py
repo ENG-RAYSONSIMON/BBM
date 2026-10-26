@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "sales",
     "purchases",
     "expenses",
+    "audit",
 ]
 
 MIDDLEWARE = [
@@ -167,6 +168,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "inventory", "description": "Batches, the stock ledger and stock alerts."},
         {"name": "purchases", "description": "Purchases from suppliers; receiving puts stock on the shelf."},
         {"name": "expenses", "description": "Operating expenses, categories and receipts."},
+        {"name": "audit", "description": "FR-20 log of sensitive actions (Owner only)."},
     ],
     # Sale and Purchase both have a `status` field with different choices.
     "ENUM_NAME_OVERRIDES": {

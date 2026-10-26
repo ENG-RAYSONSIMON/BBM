@@ -58,6 +58,7 @@ export const PERMISSIONS = {
   expensesView: 'expenses.view',
   expensesManage: 'expenses.manage',
   expensesDelete: 'expenses.delete',
+  auditView: 'audit.view',
 } as const
 
 /** DRF page-number pagination envelope. */
@@ -336,4 +337,30 @@ export type ExpensesSummary = {
   total: string
   count: number
   by_category: { category: string; category_name: string; total: string; count: number }[]
+}
+
+export const AUDIT_ACTIONS = [
+  'DELETE',
+  'SETTINGS_CHANGE',
+  'ROLE_CHANGE',
+  'SALE_VOID',
+  'PURCHASE_CANCEL',
+  'EXPENSE_CHANGE',
+  'EXPORT',
+] as const
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number]
+
+/** FR-20 audit entry. `changes` is {field: [old, new]} or details such as a reason. */
+export type AuditLogEntry = {
+  id: string
+  action: AuditAction
+  actor: string | null
+  actor_name: string
+  target_type: string
+  target_id: string | null
+  target_label: string
+  changes: Record<string, unknown>
+  ip_address: string | null
+  created_at: string
 }

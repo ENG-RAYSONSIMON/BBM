@@ -26,6 +26,7 @@ PURCHASES_MANAGE = "purchases.manage"
 EXPENSES_VIEW = "expenses.view"
 EXPENSES_MANAGE = "expenses.manage"
 EXPENSES_DELETE = "expenses.delete"
+AUDIT_VIEW = "audit.view"
 
 PERMISSIONS = {
     SETTINGS_VIEW: "View business settings.",
@@ -43,11 +44,13 @@ PERMISSIONS = {
     EXPENSES_VIEW: "View expenses, expense categories and expense totals.",
     EXPENSES_MANAGE: "Record and edit expenses and their receipts, and manage expense categories.",
     EXPENSES_DELETE: "Delete expenses and expense categories.",
+    AUDIT_VIEW: "View the audit log of sensitive actions.",
 }
 
 DEFAULT_ROLE_PERMISSIONS = {
     Role.OWNER: frozenset(PERMISSIONS),
-    # SRS 2.2: Admin runs day-to-day operations but cannot delete.
+    # SRS 2.2: Admin runs day-to-day operations but cannot delete or read
+    # the audit log.
     Role.ADMIN: frozenset(
         {
             SETTINGS_VIEW,

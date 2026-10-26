@@ -69,6 +69,13 @@ See `docs/PHASE_2_SUMMARY.md`.
   (FR-17) shows sales, gross and net profit, expenses, cash and credit for
   today, the last 7 days or this month.
 
+**In progress: Phase 4, Reporting, Notifications & Audit.** See
+`docs/PHASE_4_SUMMARY.md`.
+- Step 1 done (FR-20): an append-only audit log of deletes, settings and role
+  changes, sale voids, purchase cancellations and expense edits, written in
+  the same transaction as the action. Only the Owner (`audit.view`) can read
+  it, at `/audit`.
+
 **Languages: Kiswahili (default) and English.** A language button next to the
 theme button switches the whole app, including server error messages. See §7.
 
@@ -76,8 +83,8 @@ theme button switches the whole app, including server error messages. See §7.
 `docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. no staff-management API yet;
 media served by Django in dev only; cash is the only payment method).
 
-**Next: Phase 4** (reports with CSV export FR-18, notifications FR-19, audit
-log FR-20), unless Phase 3's known gaps come first.
+**Next: Phase 4 step 2** (reports with CSV export, FR-18), then step 3
+(notification centre, FR-19).
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -89,7 +96,7 @@ Rules that still apply:
 - Stock changes only through `inventory.services.record_movement()`.
 - Every authenticated view declares `required_permissions`. New codenames go in
   `accounts/rbac.py` plus a data migration (copy the latest,
-  `accounts/0006_phase3_purchases_expenses_permissions`).
+  `accounts/0007_phase4_audit_permission`).
 - Every endpoint gets `@extend_schema`; `accounts.tests.test_schema` fails on
   any warning. Every detail endpoint gets a cross-tenant 404 test.
 - No hard-coded user-visible text: `_()` on the backend (then `makemessages` /
@@ -329,7 +336,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (203 tests)
+docker compose exec backend python manage.py test            # whole suite (219 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -338,6 +345,7 @@ docker compose exec backend python manage.py test accounts.tests.test_permission
 docker compose exec backend python manage.py test accounts.tests.test_schema
 docker compose exec backend python manage.py test sales      # sales, credit, voids, isolation
 docker compose exec backend python manage.py test purchases  # drafts, receiving, rollback, isolation
+docker compose exec backend python manage.py test audit      # audit entries, append-only, Owner-only API
 docker compose exec backend python manage.py test expenses   # expenses, receipts, net profit, isolation
 docker compose exec backend python manage.py check
 ```
@@ -345,7 +353,7 @@ docker compose exec backend python manage.py check
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (79 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, languages
+docker compose exec frontend npm test         # Vitest (83 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
@@ -425,11 +433,13 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | GET/PUT/DELETE | `/api/v1/expenses/{id}/receipt/` | Bearer | view / `expenses.manage` |
 | GET | `/api/v1/expenses/summary/` | Bearer | `expenses.view` |
 | GET/POST/PATCH/DELETE | `/api/v1/expense-categories/` … | Bearer | `expenses.view` / `expenses.manage` / `expenses.delete` |
+| GET | `/api/v1/audit-logs/`, `/api/v1/audit-logs/{id}/` | Bearer | `audit.view` (Owner) |
 
 A missing permission returns **403**. Request and response details:
 `docs/PHASE_1_SUMMARY.md` §3 (auth), §7 (password reset), §8 (permissions);
 catalog and inventory endpoints in `docs/PHASE_2_SUMMARY.md` §5; sales in
-`docs/PHASE_3_SUMMARY.md` §4, purchases and expenses in its step 2 section.
+`docs/PHASE_3_SUMMARY.md` §4, purchases and expenses in its step 2 section;
+the audit log in `docs/PHASE_4_SUMMARY.md` §3.
 
 ```bash
 # A cash sale: 2 units, 30,000 handed over (change is computed and stored)

@@ -1,7 +1,10 @@
+from django.db import transaction
 from django.db.models import ProtectedError
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status, viewsets
 from rest_framework.exceptions import APIException
+
+from audit.services import Action, record
 
 
 class Conflict(APIException):
@@ -16,7 +19,8 @@ class TenantModelViewSet(viewsets.ModelViewSet):
     new rows get their business from the token via TenantModel.save().
 
     Deleting a row that other rows still reference (on_delete=PROTECT)
-    answers 409 instead of 500.
+    answers 409 instead of 500. A delete that goes through is audit-logged
+    (FR-20) in the same transaction.
     """
 
     model = None
@@ -27,6 +31,8 @@ class TenantModelViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         try:
-            instance.delete()
+            with transaction.atomic():
+                record(Action.DELETE, target=instance)
+                instance.delete()
         except ProtectedError:
             raise Conflict(self.protected_message)

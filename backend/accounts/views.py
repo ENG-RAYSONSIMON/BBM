@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics, status
@@ -5,6 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenRefreshView, TokenViewBase
+
+from audit.services import Action, diff, record
 
 from .models import BusinessSettings, Role
 from .rbac import SETTINGS_MANAGE, SETTINGS_VIEW
@@ -207,3 +210,10 @@ class BusinessSettingsView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return BusinessSettings.objects.get()
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        changes = diff(serializer.instance, serializer.validated_data)
+        serializer.save()
+        if changes:
+            record(Action.SETTINGS_CHANGE, target=serializer.instance, label="", changes=changes)

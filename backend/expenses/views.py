@@ -16,6 +16,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from accounts.rbac import EXPENSES_DELETE, EXPENSES_MANAGE, EXPENSES_VIEW
+from audit.services import Action, diff, record
 from core.views import TenantModelViewSet
 
 from .models import Expense, ExpenseCategory
@@ -94,6 +95,13 @@ class ExpenseViewSet(TenantModelViewSet):
         serializer.save(recorded_by=self.request.user)
 
     @transaction.atomic
+    def perform_update(self, serializer):
+        changes = diff(serializer.instance, serializer.validated_data)
+        serializer.save()
+        if changes:
+            record(Action.EXPENSE_CHANGE, target=serializer.instance, changes=changes)
+
+    @transaction.atomic
     def perform_destroy(self, instance):
         storage, name = instance.receipt.storage, instance.receipt.name
         super().perform_destroy(instance)
@@ -164,6 +172,7 @@ class ExpenseReceiptView(generics.GenericAPIView):
             new_name = expense.receipt.name
             try:
                 expense.save(update_fields=["receipt", "updated_at"])
+                record(Action.EXPENSE_CHANGE, target=expense, changes={"receipt": [old_name, new_name]})
             except Exception:
                 storage.delete(new_name)
                 raise
@@ -179,6 +188,7 @@ class ExpenseReceiptView(generics.GenericAPIView):
                 storage, name = expense.receipt.storage, expense.receipt.name
                 expense.receipt = None
                 expense.save(update_fields=["receipt", "updated_at"])
+                record(Action.EXPENSE_CHANGE, target=expense, changes={"receipt": [name, None]})
                 transaction.on_commit(lambda: storage.delete(name))
         return Response(self._expense_data(expense))
 

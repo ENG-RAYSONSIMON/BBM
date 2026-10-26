@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from accounts.models import BusinessSettings
+from audit.services import Action, record
 from catalog.models import ProductBatch
 from inventory.models import StockMovement
 from inventory.services import record_movement, resolve_batch
@@ -203,4 +204,5 @@ def cancel_purchase(*, purchase, user, reason):
     purchase.cancelled_by = user
     purchase.cancel_reason = reason[:255]
     purchase.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancel_reason", "updated_at"])
+    record(Action.PURCHASE_CANCEL, target=purchase, actor=user, changes={"reason": purchase.cancel_reason})
     return purchase

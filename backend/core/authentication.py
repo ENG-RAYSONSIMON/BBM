@@ -4,6 +4,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.services import get_active_membership
 
+from .actor import Actor, client_ip, set_current_actor
 from .tenancy import TENANT_CLAIM, set_current_business_id
 
 
@@ -30,4 +31,5 @@ class TenantJWTAuthentication(JWTAuthentication):
         request.business = membership.business
         request.membership = membership
         set_current_business_id(membership.business_id)
+        set_current_actor(Actor(user=user, ip=client_ip(request)))
         return user, validated_token

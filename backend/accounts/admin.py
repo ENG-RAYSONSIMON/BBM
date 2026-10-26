@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
+from django.db import transaction
 
+from audit.services import Action, diff, record
+from core.actor import client_ip
 from core.admin import TenantModelAdmin
 
 from .models import (
@@ -14,6 +17,44 @@ from .models import (
     User,
     UserRole,
 )
+
+
+class RoleChangeAuditMixin:
+    """FR-20: role, grant and membership edits made in Django admin are
+    audit-logged. Admin runs without a tenant, so the business is passed
+    explicitly."""
+
+    def _audit(self, request, obj, changes):
+        record(
+            Action.ROLE_CHANGE,
+            target=obj,
+            changes=changes,
+            actor=request.user,
+            ip=client_ip(request),
+            business=obj.business,
+        )
+
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            if change:
+                old = type(obj).all_objects.get(pk=obj.pk)
+                changes = diff(old, {field: getattr(obj, field) for field in form.changed_data})
+            else:
+                changes = {"created": True}
+            super().save_model(request, obj, form, change)
+            if changes:
+                self._audit(request, obj, changes)
+
+    def delete_model(self, request, obj):
+        with transaction.atomic():
+            self._audit(request, obj, {"deleted": True})
+            super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        with transaction.atomic():
+            for obj in queryset:
+                self._audit(request, obj, {"deleted": True})
+            super().delete_queryset(request, queryset)
 
 
 class EmailUserCreationForm(AdminUserCreationForm):
@@ -62,7 +103,7 @@ class BusinessAdmin(admin.ModelAdmin):
 
 
 @admin.register(Role)
-class RoleAdmin(TenantModelAdmin):
+class RoleAdmin(RoleChangeAuditMixin, TenantModelAdmin):
     """System roles can't be renamed or deleted (enforced in the model too)."""
 
     list_display = ("name", "business", "is_system")
@@ -97,7 +138,7 @@ class PermissionAdmin(admin.ModelAdmin):
 
 
 @admin.register(RolePermission)
-class RolePermissionAdmin(TenantModelAdmin):
+class RolePermissionAdmin(RoleChangeAuditMixin, TenantModelAdmin):
     list_display = ("role", "permission", "business")
     list_select_related = ("role", "permission", "business")
 
@@ -117,7 +158,7 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
 
 
 @admin.register(UserRole)
-class UserRoleAdmin(TenantModelAdmin):
+class UserRoleAdmin(RoleChangeAuditMixin, TenantModelAdmin):
     list_display = ("user", "business", "role", "is_active")
     list_select_related = ("user", "business", "role")
 

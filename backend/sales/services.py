@@ -29,6 +29,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from accounts.models import BusinessSettings
+from audit.services import Action, record
 from catalog.models import ProductBatch
 from expenses.services import expenses_total
 from inventory.models import StockMovement
@@ -372,4 +373,10 @@ def void_sale(*, sale, user, reason):
     sale.voided_by = user
     sale.void_reason = reason[:255]
     sale.save(update_fields=["status", "voided_at", "voided_by", "void_reason", "updated_at"])
+    record(
+        Action.SALE_VOID,
+        target=sale,
+        actor=user,
+        changes={"reason": sale.void_reason, "refunded": sale.amount_paid},
+    )
     return sale

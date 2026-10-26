@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from accounts.rbac import CATALOG_DELETE, CATALOG_MANAGE, CATALOG_VIEW
+from audit.services import Action, record
 from core.views import Conflict, TenantModelViewSet
 from inventory.services import with_product_stock
 
@@ -124,6 +125,7 @@ class ProductViewSet(TenantModelViewSet):
         if instance.stock_movements.exists():
             raise Conflict(_("This product has stock history and can't be deleted. Archive it instead."))
         storage, image_name = instance.image.storage, instance.image.name
+        record(Action.DELETE, target=instance)
         instance.batches.all().delete()  # empty batches only: no movements
         instance.delete()
         if image_name:
