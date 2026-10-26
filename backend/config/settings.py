@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "expenses",
     "audit",
     "reports",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -171,6 +172,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "expenses", "description": "Operating expenses, categories and receipts."},
         {"name": "audit", "description": "FR-20 log of sensitive actions (Owner only)."},
         {"name": "reports", "description": "FR-18 sales, profit, expense, stock-valuation and expiry reports, with CSV export."},
+        {"name": "notifications", "description": "FR-19 in-app notification centre (low stock, expiry)."},
     ],
     # Sale and Purchase both have a `status` field with different choices.
     "ENUM_NAME_OVERRIDES": {

@@ -290,11 +290,30 @@ Do not run pg_restore against a populated live database using these commands.
 Verify receipt authorization, row counts and images after restoration. Never use
 `docker compose down -v` for routine updates; it destroys application data.
 
+## Scheduled jobs
+
+The `scheduler` service runs the backend image with
+`python manage.py generate_notifications` once an hour (FR-19 low-stock and
+expiry alerts). It has no ports and no healthcheck: the loop keeps running even
+if a run fails, so check its logs (`docker compose logs --tail=50 scheduler`) for
+`Notifications: … opened` lines or errors. The command is idempotent, so a run
+right after a restart or a manual run is harmless:
+
+```bash
+docker compose exec scheduler python manage.py generate_notifications
+```
+
+`deploy.sh` stops only nginx and backend before the backup. The scheduler keeps
+running through `pg_dump` (a consistent snapshot) and `migrate`, and it is
+recreated with the new image by the final `up -d`. It only writes notification
+rows, which the next run rebuilds. Once every server has a release with the
+scheduler service, `deploy.sh` can also stop it before the backup.
+
 ## Checks before accepting a release
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 backend nginx
+docker compose logs --tail=100 backend nginx scheduler
 curl -I http://bbm.mauzo.tz
 curl -I https://bbm.mauzo.tz
 curl -I https://bbmapi.mauzo.tz/admin/login/

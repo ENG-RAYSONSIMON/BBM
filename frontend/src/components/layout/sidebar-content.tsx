@@ -19,6 +19,7 @@ import { NavLink, useNavigate } from 'react-router'
 
 import { Brand } from './brand'
 import { LanguageToggle } from '@/components/language-toggle'
+import { NotificationBell } from '@/components/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
@@ -105,6 +106,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               {displayName} · {me?.role}
             </p>
           </div>
+          <NotificationBell onNavigate={onNavigate} />
           <LanguageToggle />
           <ThemeToggle />
         </div>

@@ -68,6 +68,25 @@ services:
       retries: 3
     logging: *logging
 
+  # FR-19: opens and resolves low-stock and expiry notifications. The command
+  # is idempotent, so hourly runs (and a run right after each restart) are safe.
+  scheduler:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to a GHCR tag or digest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_production
+    # An init process forwards SIGTERM, so stopping doesn't wait for the kill timeout.
+    init: true
+    command: ["sh", "-c", "while true; do python manage.py generate_notifications; sleep 3600; done"]
+    networks: [application]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *logging
+
   nginx:
     image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE to a GHCR tag or digest}
     restart: unless-stopped

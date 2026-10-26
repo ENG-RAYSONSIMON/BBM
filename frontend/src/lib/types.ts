@@ -451,3 +451,29 @@ export type ExpiryReport = {
   rows: ExpiryReportRow[]
   totals: { batch_count: number; stock_on_hand: number; cost_value: string; expired_value: string }
 }
+
+// ---- FR-19 notifications ----
+
+export type NotificationKind = 'LOW_STOCK' | 'EXPIRING' | 'EXPIRED'
+
+/** Text is rendered from `kind` + `params` in the reader's language. */
+export type AppNotification = {
+  id: string
+  kind: NotificationKind
+  channel: 'IN_APP' | 'EMAIL' | 'SMS' | 'WHATSAPP'
+  params: {
+    product?: string
+    name?: string
+    stock?: number
+    unit?: string
+    threshold?: number
+    batch_number?: string
+    expiry_date?: string
+    days?: number
+  }
+  target_type: string
+  target_id: string | null
+  is_read: boolean
+  resolved_at: string | null
+  created_at: string
+}

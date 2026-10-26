@@ -1,10 +1,10 @@
-# Phase 4 — Reporting, Notifications & Audit (step 1: audit log, step 2: reports)
+# Phase 4 — Reporting, Notifications & Audit
 
 Covers **FR-20** (sensitive actions logged, readable only by the Owner) from
 `docs/BBM_SRS_Summary_Draft.pdf`. Reports with CSV export (FR-18) are step 2
 and the notification centre (FR-19) is step 3.
 
-Status as of 2026-10-26: step 1 committed (`a0ac5a8`); step 2 is at the end of this file.
+Status as of 2026-10-26: step 1 committed (`a0ac5a8`); steps 2 and 3 follow below.
 - Backend: 219 tests (203 before, 16 new). The schema validates with `--fail-on-warn`.
 - Frontend: 83 Vitest tests (4 new).
 
@@ -62,7 +62,7 @@ Decisions taken with the product owner:
 
 # Step 2: reports with CSV export (FR-18)
 
-Status as of 2026-10-26: implemented, not yet committed.
+Status as of 2026-10-26: committed (`9997253`).
 - Backend: 238 tests (219 after step 1, 19 new). The schema validates with `--fail-on-warn`.
 - Frontend: 88 Vitest tests (5 new).
 
@@ -111,3 +111,55 @@ JSON answers carry `rows` and `totals` (plus `period`/`date_from`/`date_to`, or 
 - [ ] No outstanding-credit column per period; the dashboard shows what customers owe overall.
 - [ ] The reports permission shows profit and expense figures even to a role without `expenses.view` (the dashboard hides them in that case).
 - [ ] Reports aren't cached; each request queries live data. Fine at single-shop volumes.
+
+---
+
+# Step 3: notification centre (FR-19)
+
+Status as of 2026-10-26: implemented, not yet committed.
+- Backend: 255 tests (238 after step 2, 17 new). The schema validates with `--fail-on-warn`.
+- Frontend: 94 Vitest tests (6 new).
+
+Decisions:
+- **No Celery.** `manage.py generate_notifications` makes the alerts; production runs it hourly in a `scheduler` service (see `docs/DEPLOYMENT.md`, "Scheduled jobs"). In development, run it by hand.
+- **One alert per problem, not per run.** A notification stays *open* while its condition lasts, with its figures (stock, days left) refreshed each run, and is *resolved* when it ends (restocked, batch sold or written off). If the problem comes back, a new one opens.
+- **Read state is per person**, since one business-wide alert reaches everyone who can see stock.
+- **Outside channels are reserved:** email, SMS and WhatsApp exist as interfaces but have no provider (FR-23, Phase 5). Using one logs an error and raises, never pretends to succeed.
+
+## S3.1 App: `notifications`
+
+| Model | Holds |
+|---|---|
+| `Notification` | `kind` (`LOW_STOCK`, `EXPIRING`, `EXPIRED`), `channel` (`IN_APP`; `EMAIL`/`SMS`/`WHATSAPP` reserved), `recipient` (empty = business-wide), `required_permission` (stock alerts: `inventory.view`), `params` (product, name, stock, batch, expiry date, days), target product, `dedupe_key`, `resolved_at`. A partial unique constraint allows one **open** notification per key per business. No text is stored: the client writes it from `kind` + `params` in the reader's language. |
+| `NotificationRead` | Who read which notification. |
+
+**`notifications/services.py`**
+- `sync_stock_notifications(today)`, atomic for the active business: opens alerts for active products at or under their reorder level (or the business threshold), batches expiring within the business's expiry warning days, and expired batches still holding stock. It refreshes the figures of open ones and resolves those whose condition ended. Concurrent runs can't open duplicates (the constraint plus `ignore_conflicts`).
+- `visible_to(user, codenames)`: the caller's business-wide and personal notifications whose required permission they hold, with `is_read`.
+- `mark_read`, `mark_all_read` (only what the caller can see).
+
+**`notifications/channels.py`**: `deliver(notification, user)`. In-app does nothing (the row is the delivery); the reserved channels raise `ChannelNotConfigured`.
+
+**`generate_notifications`** walks every active business in its own tenant context. One failing business is reported and the rest still run; the command then exits with an error.
+
+## S3.2 API (any member; each notification needs its own permission)
+
+| Method | Path | Does |
+|---|---|---|
+| GET | `/api/v1/notifications/` (`?unread=true`, `?open=true`, `?kind=`) | My notifications, newest first |
+| GET | `/api/v1/notifications/{id}/` | One notification (404 if not mine to see) |
+| POST | `/api/v1/notifications/{id}/read/` | Mark read (204) |
+| POST | `/api/v1/notifications/read-all/` | Mark all read (204) |
+| GET | `/api/v1/notifications/unread-count/` | `{"unread": n}`: open and unread |
+
+## S3.3 Frontend
+
+- A bell with the unread count in the sidebar footer and the mobile top bar. It checks every minute and links to `/notifications`.
+- `/notifications`: alerts in plain words ("Shea Butter is running low: 3 pcs left."), New/Sorted badges, "All" / "New only", "Mark all read". Tapping an alert marks it read and opens its product.
+
+## S3.4 Known gaps
+
+- [ ] Alerts appear up to an hour after stock changes (the scheduler interval), not instantly.
+- [ ] No notifications other than stock ones yet (e.g. a customer's credit overdue).
+- [ ] The scheduler has no healthcheck; a run that keeps failing shows only in its logs.
+- [ ] Old resolved notifications are never cleaned up.

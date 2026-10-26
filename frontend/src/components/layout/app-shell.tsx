@@ -6,6 +6,7 @@ import { Outlet, useLocation } from 'react-router'
 import { Brand } from './brand'
 import { SidebarContent } from './sidebar-content'
 import { LanguageToggle } from '@/components/language-toggle'
+import { NotificationBell } from '@/components/notification-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
@@ -50,6 +51,7 @@ export function AppShell() {
           <Brand compact />
           <span className="truncate font-medium">{me?.business.name}</span>
         </div>
+        <NotificationBell />
         <LanguageToggle />
         <ThemeToggle />
       </header>

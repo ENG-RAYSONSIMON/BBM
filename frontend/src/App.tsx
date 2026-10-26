@@ -73,6 +73,7 @@ const router = createBrowserRouter([
           { path: '/catalog', lazy: () => import('@/pages/catalog').then((m) => ({ Component: m.CatalogPage })) },
           { path: '/settings', lazy: () => import('@/pages/settings').then((m) => ({ Component: m.SettingsPage })) },
           { path: '/reports', lazy: () => import('@/pages/reports').then((m) => ({ Component: m.ReportsPage })) },
+          { path: '/notifications', lazy: () => import('@/pages/notifications').then((m) => ({ Component: m.NotificationsPage })) },
           { path: '/audit', lazy: () => import('@/pages/audit').then((m) => ({ Component: m.AuditPage })) },
         ],
       },

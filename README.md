@@ -79,6 +79,10 @@ See `docs/PHASE_2_SUMMARY.md`.
   week, month or year, stock value and expiry, each with a chart, a table and
   a CSV download (`reports.view` / `reports.export`; every download is
   audit-logged).
+- Step 3 done (FR-19): a notification centre with a bell for low-stock,
+  expiring and expired stock. `manage.py generate_notifications` (hourly in
+  production) opens and resolves the alerts. Email, SMS and WhatsApp are
+  reserved channels that fail visibly until Phase 5.
 
 **Languages: Kiswahili (default) and English.** A language button next to the
 theme button switches the whole app, including server error messages. See §7.
@@ -87,7 +91,9 @@ theme button switches the whole app, including server error messages. See §7.
 `docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. no staff-management API yet;
 media served by Django in dev only; cash is the only payment method).
 
-**Next: Phase 4 step 3** (notification centre, FR-19).
+**Next:** Phase 4 is complete. Phase 5 (loyalty, 2FA and printed receipts,
+real SMS/WhatsApp) or the open known gaps (other payment methods, staff
+management, overselling override).
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -339,7 +345,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (238 tests)
+docker compose exec backend python manage.py test            # whole suite (255 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -350,6 +356,7 @@ docker compose exec backend python manage.py test sales      # sales, credit, vo
 docker compose exec backend python manage.py test purchases  # drafts, receiving, rollback, isolation
 docker compose exec backend python manage.py test audit      # audit entries, append-only, Owner-only API
 docker compose exec backend python manage.py test reports    # report figures, CSV export, permissions, isolation
+docker compose exec backend python manage.py test notifications  # alert generation, read state, visibility, channels
 docker compose exec backend python manage.py test expenses   # expenses, receipts, net profit, isolation
 docker compose exec backend python manage.py check
 ```
@@ -357,7 +364,7 @@ docker compose exec backend python manage.py check
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (88 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, languages
+docker compose exec frontend npm test         # Vitest (94 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
@@ -440,12 +447,14 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | GET | `/api/v1/audit-logs/`, `/api/v1/audit-logs/{id}/` | Bearer | `audit.view` (Owner) |
 | GET | `/api/v1/reports/{sales,profit,expenses,stock-valuation,expiry}/` | Bearer | `reports.view` |
 | GET | `/api/v1/reports/{…}/export/` (CSV) | Bearer | `reports.export` |
+| GET | `/api/v1/notifications/`, `…/{id}/`, `…/unread-count/` | Bearer | any member (each alert needs its permission) |
+| POST | `/api/v1/notifications/{id}/read/`, `…/read-all/` | Bearer | any member |
 
 A missing permission returns **403**. Request and response details:
 `docs/PHASE_1_SUMMARY.md` §3 (auth), §7 (password reset), §8 (permissions);
 catalog and inventory endpoints in `docs/PHASE_2_SUMMARY.md` §5; sales in
 `docs/PHASE_3_SUMMARY.md` §4, purchases and expenses in its step 2 section;
-the audit log in `docs/PHASE_4_SUMMARY.md` §3, reports in its S2.2.
+the audit log in `docs/PHASE_4_SUMMARY.md` §3, reports in its S2.2, notifications in its S3.2.
 
 ```bash
 # A cash sale: 2 units, 30,000 handed over (change is computed and stored)

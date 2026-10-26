@@ -1,12 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AppShell } from './app-shell'
 import { AuthContext } from '@/lib/auth-context'
 import type { AuthContextValue } from '@/lib/auth-context'
-import { ME } from '@/test/fetch-mock'
+import { ME, mockFetch } from '@/test/fetch-mock'
 
 function renderShell() {
   const auth: AuthContextValue = {
@@ -32,15 +33,21 @@ function renderShell() {
     ],
     { initialEntries: ['/'] },
   )
+  // The notification bell polls the unread count.
+  mockFetch({ 'GET /notifications/unread-count/': { status: 200, body: { unread: 0 } } })
   render(
-    <AuthContext.Provider value={auth}>
-      <RouterProvider router={router} />
-    </AuthContext.Provider>,
+    <QueryClientProvider client={new QueryClient()}>
+      <AuthContext.Provider value={auth}>
+        <RouterProvider router={router} />
+      </AuthContext.Provider>
+    </QueryClientProvider>,
   )
   return auth
 }
 
 describe('AppShell mobile menu', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it('opens the sidebar as a drawer and closes it after navigating', async () => {
     renderShell()
     const user = userEvent.setup()
