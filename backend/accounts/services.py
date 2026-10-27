@@ -269,6 +269,15 @@ def _check_manageable(membership, actor):
         )
 
 
+def _check_not_shared(membership, message):
+    """Refuse changes to an account that also belongs to another business:
+    this shop must not change or take over a login used elsewhere."""
+    # all_objects: the check must see the user's other businesses, which the
+    # scoped manager hides. Only existence is read.
+    if UserRole.all_objects.filter(user=membership.user).exclude(business_id=membership.business_id).exists():
+        raise ValidationError({"non_field_errors": [message]})
+
+
 def _validate_temp_password(password, user):
     if not password:
         raise ValidationError({"temp_password": [_("Enter a temporary password.")]})
@@ -318,13 +327,26 @@ def add_staff(*, actor, email, role, temp_password, first_name="", last_name="",
 
 
 @transaction.atomic
-def change_staff(membership, *, actor, role=None, is_active=None):
-    """Change a staff member's role or turn their access off or on. Turning
-    off takes effect on their next request (authentication checks the
-    membership every time); their sales stay on record."""
+def change_staff(membership, *, actor, role=None, is_active=None, **details):
+    """Change a staff member's role, name or phone, or turn their access off
+    or on. Turning off takes effect on their next request (authentication
+    checks the membership every time); their sales stay on record. Name and
+    phone (`details`) are refused for an account also used at another
+    business."""
     membership = UserRole.objects.select_for_update().select_related("role", "user").get(pk=membership.pk)
     _check_manageable(membership, actor)
-    changes = {}
+    user = membership.user
+    changes = {
+        field: [getattr(user, field), value] for field, value in details.items() if value != getattr(user, field)
+    }
+    if changes:
+        _check_not_shared(
+            membership,
+            _("This person also uses their account at another business, so their name and phone can't be changed here."),
+        )
+        for field, (_old, new) in changes.items():
+            setattr(user, field, new)
+        user.save(update_fields=list(changes))
     if role is not None and role.pk != membership.role_id:
         _check_role(role, actor)
         changes["role"] = [membership.role.name, role.name]
@@ -332,8 +354,9 @@ def change_staff(membership, *, actor, role=None, is_active=None):
     if is_active is not None and is_active != membership.is_active:
         changes["is_active"] = [membership.is_active, is_active]
         membership.is_active = is_active
-    if changes:
+    if "role" in changes or "is_active" in changes:
         membership.save()
+    if changes:
         record(Action.STAFF_CHANGE, target=membership, label=_staff_label(membership.user), changes=changes)
     return membership
 
@@ -346,17 +369,10 @@ def reset_staff_password(membership, *, actor, temp_password):
     membership = UserRole.objects.select_related("role", "user").get(pk=membership.pk)
     _check_manageable(membership, actor)
     user = membership.user
-    # all_objects: the check must see the user's other businesses, which the
-    # scoped manager hides. Only existence is read.
-    if UserRole.all_objects.filter(user=user).exclude(business_id=membership.business_id).exists():
-        raise ValidationError(
-            {
-                "non_field_errors": [
-                    _("This person also uses their account at another business. "
-                      "Ask them to use “Forgot password” instead.")
-                ]
-            }
-        )
+    _check_not_shared(
+        membership,
+        _("This person also uses their account at another business. Ask them to use “Forgot password” instead."),
+    )
     _validate_temp_password(temp_password, user)
     _set_password(user, temp_password, must_change=True)
     end_sessions(user)

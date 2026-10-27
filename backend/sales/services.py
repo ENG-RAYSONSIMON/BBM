@@ -9,7 +9,7 @@ owes is always derived from its Payment rows, never stored.
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import (
     Case,
     CharField,
@@ -105,6 +105,38 @@ def with_customer_balance(customers):
     ).annotate(balance=F("total_bought") - F("amount_paid"))
 
 
+def _net_cash(payments):
+    """Payments minus refunds over a Payment queryset; 0 when empty."""
+    return payments.aggregate(
+        net=Coalesce(
+            Sum(
+                Case(
+                    When(kind=Payment.Kind.REFUND, then=-F("amount")),
+                    default=F("amount"),
+                    output_field=MONEY,
+                )
+            ),
+            Value(ZERO),
+            output_field=MONEY,
+        )
+    )["net"]
+
+
+def my_sales_today(user):
+    """A seller's own day: their completed sales and what they took in
+    (payments − refunds they handled). No cost or profit."""
+    today = timezone.localdate()
+    totals = Sale.objects.filter(status=Sale.Status.COMPLETED, sold_by=user, created_at__date=today).aggregate(
+        sales_count=Count("id"),
+        revenue=Coalesce(Sum("total"), Value(ZERO), output_field=MONEY),
+    )
+    return {
+        "date": today,
+        **totals,
+        "cash_collected": _net_cash(Payment.objects.filter(received_by=user, created_at__date=today)),
+    }
+
+
 def sales_summary(date_from, date_to):
     """FR-16/FR-17 figures for local dates date_from..date_to (inclusive).
     Void sales are left out. Profit counts when the sale happens, even on
@@ -119,25 +151,10 @@ def sales_summary(date_from, date_to):
         cogs=Coalesce(Sum("cost_total"), Value(ZERO), output_field=MONEY),
     )
 
-    def net(payments):
-        return payments.aggregate(
-            net=Coalesce(
-                Sum(
-                    Case(
-                        When(kind=Payment.Kind.REFUND, then=-F("amount")),
-                        default=F("amount"),
-                        output_field=MONEY,
-                    )
-                ),
-                Value(ZERO),
-                output_field=MONEY,
-            )
-        )["net"]
-
     owed_total = Sale.objects.filter(status=Sale.Status.COMPLETED).aggregate(
         sum=Coalesce(Sum("total"), Value(ZERO), output_field=MONEY)
     )["sum"]
-    owed_paid = net(Payment.objects.filter(sale__status=Sale.Status.COMPLETED))
+    owed_paid = _net_cash(Payment.objects.filter(sale__status=Sale.Status.COMPLETED))
     gross_profit = totals["revenue"] - totals["cogs"]
     expenses = expenses_total(date_from, date_to)
     return {
@@ -147,7 +164,7 @@ def sales_summary(date_from, date_to):
         "gross_profit": gross_profit,
         "expenses": expenses,
         "net_profit": gross_profit - expenses,
-        "cash_collected": net(Payment.objects.filter(**in_range)),
+        "cash_collected": _net_cash(Payment.objects.filter(**in_range)),
         "outstanding_credit": owed_total - owed_paid,
     }
 
@@ -254,9 +271,16 @@ def create_sale(*, user, lines, customer=None, new_customer=None, amount_receive
         raise ValidationError({"items": shortages})
 
     if customer is None and new_customer:
-        customer = Customer.objects.create(
-            name=new_customer["name"].strip(), phone=new_customer.get("phone", "").strip()
-        )
+        try:
+            with transaction.atomic():
+                customer = Customer.objects.create(
+                    name=new_customer["name"].strip(), phone=new_customer.get("phone", "").strip()
+                )
+        except IntegrityError:
+            # Lost a race with another sale adding the same phone.
+            raise ValidationError(
+                {"new_customer": [_("A customer with this phone number already exists. Choose them instead.")]}
+            )
 
     sale = Sale.objects.create(
         number=number,

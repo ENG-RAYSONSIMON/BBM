@@ -223,4 +223,9 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@bbm.local")
 
 # FR-4 password reset
 PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=30 * 60)  # seconds
-FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+FRONTEND_URL = env("FRONTEND_URL", default="https://bbm.mauzo.tz")
+
+# Scheduled jobs (manage.py generate_notifications hourly, cleanup daily)
+NOTIFICATION_RETENTION_DAYS = env.int("NOTIFICATION_RETENTION_DAYS", default=90)
+# Touched after each clean run; the scheduler's healthcheck reads its age. Empty: off.
+SCHEDULER_HEARTBEAT_FILE = env("SCHEDULER_HEARTBEAT_FILE", default="")

@@ -1,3 +1,4 @@
+from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -45,6 +46,15 @@ class CustomerSerializer(serializers.ModelSerializer):
         if _phone_taken(value, exclude=self.instance):
             raise serializers.ValidationError(_("A customer with this phone number already exists."))
         return value
+
+    def save(self, **kwargs):
+        # validate_phone can't see a customer added at the same moment; the
+        # database constraint can.
+        try:
+            with transaction.atomic():
+                return super().save(**kwargs)
+        except IntegrityError:
+            raise serializers.ValidationError({"phone": [_("A customer with this phone number already exists.")]})
 
 
 class NewCustomerSerializer(serializers.Serializer):
@@ -224,6 +234,13 @@ class SaleDetailSerializer(SaleSerializer):
 
     def get_voided_by_name(self, sale) -> str:
         return _person(sale.voided_by)
+
+
+class MySalesSummarySerializer(serializers.Serializer):
+    date = serializers.DateField(help_text="Today (Africa/Dar_es_Salaam).")
+    sales_count = serializers.IntegerField(help_text="Your completed sales today.")
+    revenue = serializers.DecimalField(**MONEY)
+    cash_collected = serializers.DecimalField(**MONEY, help_text="Payments − refunds you took in today.")
 
 
 class SalesSummarySerializer(serializers.Serializer):

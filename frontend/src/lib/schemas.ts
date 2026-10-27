@@ -63,6 +63,15 @@ export const staffSchema = z.object({
 })
 export type StaffValues = z.infer<typeof staffSchema>
 
+export const staffEditSchema = z.object({
+  first_name: z.string().trim().max(150),
+  last_name: z.string().trim().max(150),
+  phone: z.string().trim().max(20),
+  role: z.string().min(1, 'errors.chooseRole'),
+  is_active: z.boolean(),
+})
+export type StaffEditValues = z.infer<typeof staffEditSchema>
+
 export const staffPasswordSchema = z.object({ temp_password: newPassword })
 export type StaffPasswordValues = z.infer<typeof staffPasswordSchema>
 

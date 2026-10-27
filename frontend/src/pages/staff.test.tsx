@@ -122,6 +122,8 @@ describe('StaffPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add staff' }))
     expect(await within(dialog).findByText('Staff member added')).toBeInTheDocument()
     expect(within(dialog).getByText(new RegExp(`Temporary password: ${password}`))).toBeInTheDocument()
+    // The live site's address, not wherever this page happens to run.
+    expect(within(dialog).getByText(/https:\/\/bbm\.mauzo\.tz/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Copy login details' })).toBeInTheDocument()
 
     const body = JSON.parse(String(fetchMock.calls.filter((c) => c.key === 'POST /staff/')[1].init.body))
@@ -139,7 +141,35 @@ describe('StaffPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
     const call = fetchMock.calls.find((c) => c.key === 'PATCH /staff/m-neema/')!
-    expect(JSON.parse(String(call.init.body))).toEqual({ role: 'r-seller', is_active: false })
+    expect(JSON.parse(String(call.init.body))).toEqual({
+      first_name: 'Neema', last_name: 'Juma', phone: '', role: 'r-seller', is_active: false,
+    })
+  })
+
+  it('changes name and phone, and shows why a shared account is refused', async () => {
+    const refused = "This person also uses their account at another business, so their name and phone can't be changed here."
+    const fetchMock = mockFetch(routes({
+      'PATCH /staff/m-neema/': [
+        { status: 400, body: { non_field_errors: [refused] } },
+        { status: 200, body: member({ last_name: 'Mushi', phone: '0712345678' }) },
+      ],
+    }))
+    renderWithAuth('/staff', ROUTES, PERMS)
+    const user = userEvent.setup()
+
+    await user.click(within(await screen.findByRole('table', { name: 'staff' })).getByText('Neema Juma'))
+    const dialog = screen.getByRole('dialog')
+    const lastName = within(dialog).getByLabelText('Last name')
+    await user.clear(lastName)
+    await user.type(lastName, 'Mushi')
+    await user.type(within(dialog).getByLabelText(/Phone/), '0712345678')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await within(dialog).findByText(refused)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    const calls = fetchMock.calls.filter((c) => c.key === 'PATCH /staff/m-neema/')
+    expect(calls).toHaveLength(2)
+    expect(JSON.parse(String(calls[1].init.body))).toMatchObject({ last_name: 'Mushi', phone: '0712345678' })
   })
 
   it("doesn't open someone you can't manage", async () => {

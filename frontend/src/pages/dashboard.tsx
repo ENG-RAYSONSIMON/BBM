@@ -24,7 +24,7 @@ import type { Period } from '@/lib/dates'
 import { formatTZS } from '@/lib/format'
 import { roleLabel } from '@/lib/roles'
 import { PERMISSIONS } from '@/lib/types'
-import type { InventorySummary, SalesSummary } from '@/lib/types'
+import type { InventorySummary, MySalesSummary, SalesSummary } from '@/lib/types'
 import { toQuery } from '@/lib/use-list-params'
 
 type Icon = ComponentType<{ className?: string }>
@@ -43,6 +43,8 @@ export function DashboardPage() {
   const canSeeStock = can(PERMISSIONS.inventoryView)
   // The totals cover everyone's sales; a seller sees only their own sales list.
   const canSeeSales = can(PERMISSIONS.salesViewAll)
+  // Without the totals (a seller), their own day instead.
+  const canSeeMine = !canSeeSales && can(PERMISSIONS.salesView)
   const canSeeProfit = can(PERMISSIONS.financeView)
   const canSeeExpenses = can(PERMISSIONS.expensesView)
   const [period, setPeriod] = useState<Period>('today')
@@ -52,6 +54,11 @@ export function DashboardPage() {
     queryFn: () => api<SalesSummary>(`/sales/summary/${toQuery(periodRange(period))}`),
     enabled: canSeeSales,
     placeholderData: (previous) => previous,
+  })
+  const mine = useQuery({
+    queryKey: ['sales', 'my-summary'],
+    queryFn: () => api<MySalesSummary>('/sales/my-summary/'),
+    enabled: canSeeMine,
   })
   const summary = useQuery({
     queryKey: ['inventory', 'summary'],
@@ -157,6 +164,32 @@ export function DashboardPage() {
               error={sales.isError}
             >
               {t('dashboard.owedHint')}
+            </Tile>
+          </>
+        )}
+        {canSeeMine && (
+          <>
+            <Tile
+              label={t('dashboard.mySales_today')}
+              icon={ShoppingBagIcon}
+              to="/sales"
+              value={mine.data && formatTZS(mine.data.revenue)}
+              loading={mine.isPending}
+              error={mine.isError}
+            >
+              {mine.data &&
+                (mine.data.sales_count === 0
+                  ? t('dashboard.noSalesToday')
+                  : t('dashboard.salesCount', { count: mine.data.sales_count }))}
+            </Tile>
+            <Tile
+              label={t('dashboard.myCash_today')}
+              icon={BanknoteIcon}
+              value={mine.data && formatTZS(mine.data.cash_collected)}
+              loading={mine.isPending}
+              error={mine.isError}
+            >
+              {t('dashboard.myCashHint')}
             </Tile>
           </>
         )}

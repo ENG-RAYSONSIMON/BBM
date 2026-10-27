@@ -4,6 +4,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from core.serializers import FinanceFieldsMixin
+
 from .services import PERIODS
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -48,22 +50,32 @@ class PeriodReportSerializer(serializers.Serializer):
     date_to = serializers.DateField()
 
 
-class SalesRowSerializer(serializers.Serializer):
+FINANCE_ONLY = "Left out without the finance.view permission."
+SALES_FINANCE_FIELDS = ("cogs", "gross_profit")
+
+
+class SalesRowSerializer(FinanceFieldsMixin, serializers.Serializer):
+    finance_fields = SALES_FINANCE_FIELDS
+
     period = serializers.DateField(help_text="First day of the period (weeks start on Monday).")
     sales_count = serializers.IntegerField()
     revenue = serializers.DecimalField(**MONEY)
     discounts = serializers.DecimalField(**MONEY)
-    cogs = serializers.DecimalField(**MONEY, help_text="Cost of goods sold, from the sale snapshots.")
-    gross_profit = serializers.DecimalField(**MONEY)
+    cogs = serializers.DecimalField(
+        **MONEY, required=False, help_text=f"Cost of goods sold, from the sale snapshots. {FINANCE_ONLY}"
+    )
+    gross_profit = serializers.DecimalField(**MONEY, required=False, help_text=FINANCE_ONLY)
     cash_collected = serializers.DecimalField(**MONEY, help_text="Payments − refunds received in the period.")
 
 
-class SalesTotalsSerializer(serializers.Serializer):
+class SalesTotalsSerializer(FinanceFieldsMixin, serializers.Serializer):
+    finance_fields = SALES_FINANCE_FIELDS
+
     sales_count = serializers.IntegerField()
     revenue = serializers.DecimalField(**MONEY)
     discounts = serializers.DecimalField(**MONEY)
-    cogs = serializers.DecimalField(**MONEY)
-    gross_profit = serializers.DecimalField(**MONEY)
+    cogs = serializers.DecimalField(**MONEY, required=False, help_text=FINANCE_ONLY)
+    gross_profit = serializers.DecimalField(**MONEY, required=False, help_text=FINANCE_ONLY)
     cash_collected = serializers.DecimalField(**MONEY)
 
 
@@ -112,7 +124,10 @@ class ExpensesReportSerializer(PeriodReportSerializer):
     totals = ExpensesTotalsSerializer()
 
 
-LATEST_COST = "At the product's latest cost price, not each batch's own cost."
+BATCH_COST = (
+    "At what each batch cost: the average paid on its received purchases, or the product's "
+    "cost price for stock with no purchase (opening stock, adjustments)."
+)
 
 
 class StockValuationRowSerializer(serializers.Serializer):
@@ -125,7 +140,7 @@ class StockValuationRowSerializer(serializers.Serializer):
     stock_on_hand = serializers.IntegerField()
     cost_price = serializers.DecimalField(**MONEY)
     selling_price = serializers.DecimalField(**MONEY)
-    cost_value = serializers.DecimalField(**VALUE, help_text=LATEST_COST)
+    cost_value = serializers.DecimalField(**VALUE, help_text=BATCH_COST)
     retail_value = serializers.DecimalField(**VALUE)
 
 
@@ -153,15 +168,15 @@ class ExpiryRowSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=("expired", "expiring"))
     is_active = serializers.BooleanField()
     stock_on_hand = serializers.IntegerField()
-    cost_price = serializers.DecimalField(**MONEY, help_text=LATEST_COST)
-    cost_value = serializers.DecimalField(**VALUE, help_text=LATEST_COST)
+    cost_price = serializers.DecimalField(**MONEY, help_text=BATCH_COST)
+    cost_value = serializers.DecimalField(**VALUE, help_text=BATCH_COST)
 
 
 class ExpiryTotalsSerializer(serializers.Serializer):
     batch_count = serializers.IntegerField()
     stock_on_hand = serializers.IntegerField()
-    cost_value = serializers.DecimalField(**VALUE, help_text=LATEST_COST)
-    expired_value = serializers.DecimalField(**VALUE, help_text=LATEST_COST)
+    cost_value = serializers.DecimalField(**VALUE, help_text=BATCH_COST)
+    expired_value = serializers.DecimalField(**VALUE, help_text=BATCH_COST)
 
 
 class ExpiryReportSerializer(serializers.Serializer):

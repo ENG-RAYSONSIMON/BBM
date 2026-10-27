@@ -46,12 +46,42 @@ describe('ReportsPage', () => {
     expect(screen.queryByRole('button', { name: /Download CSV/ })).not.toBeInTheDocument()
   })
 
+  it('leaves out cost and profit without finance.view', async () => {
+    const { cogs: _cogs, gross_profit: _profit, ...totals } = SALES.totals
+    mockFetch({
+      'GET /reports/sales/': {
+        status: 200,
+        body: { ...SALES, rows: SALES.rows.map(({ cogs: _c, gross_profit: _g, ...row }) => row), totals },
+      },
+    })
+    renderWithAuth('/reports?report=profit', ROUTES, ['reports.view'])
+
+    // Asking for the profit report by URL falls back to sales.
+    const table = await screen.findByRole('table', { name: 'Sales' })
+    expect(within(table).queryByText('Gross profit')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gross profit')).not.toBeInTheDocument()
+    for (const name of ['Profit', 'Stock value', 'Expiry']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+    // Without expenses.view, no spending either.
+    expect(screen.queryByRole('button', { name: 'Expenses' })).not.toBeInTheDocument()
+  })
+
+  it('shows the expenses report with expenses.view', async () => {
+    mockFetch({ 'GET /reports/sales/': { status: 200, body: SALES } })
+    renderWithAuth('/reports', ROUTES, ['reports.view', 'expenses.view'])
+    await screen.findByRole('table', { name: 'Sales' })
+    expect(screen.getByRole('button', { name: 'Expenses' })).toBeInTheDocument()
+    // Profit needs finance.view as well.
+    expect(screen.queryByRole('button', { name: 'Profit' })).not.toBeInTheDocument()
+  })
+
   it('switches report and sends the chosen period', async () => {
     const mock = mockFetch({
       'GET /reports/sales/': { status: 200, body: SALES },
       'GET /reports/stock-valuation/': { status: 200, body: STOCK },
     })
-    renderWithAuth('/reports', ROUTES, ['reports.view'])
+    renderWithAuth('/reports', ROUTES, ['reports.view', 'finance.view'])
     await screen.findByRole('table', { name: 'Sales' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Month' }))

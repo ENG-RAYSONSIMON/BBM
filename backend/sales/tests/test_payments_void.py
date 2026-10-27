@@ -1,6 +1,6 @@
 """Paying off credit, voiding sales, and the FR-16/FR-17 summary."""
 
-from django.db import transaction
+from django.db import DatabaseError, connection, transaction
 from django.db.models import Sum
 from django.urls import reverse
 
@@ -56,6 +56,21 @@ class PaymentTests(SalesAPITestCase):
             with self.assertRaises(PaymentImmutable), transaction.atomic():
                 Payment.objects.all().delete()
         self.assertEqual(Payment.all_objects.count(), 1)
+
+    def test_database_refuses_changes_past_the_orm(self):
+        self.sell()
+        payment = Payment.all_objects.get()
+        statements = [
+            "UPDATE sales_payment SET amount = 1 WHERE id = %s",
+            "DELETE FROM sales_payment WHERE id = %s",
+        ]
+        for sql in statements:
+            with self.subTest(sql), self.assertRaises(DatabaseError), transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, [payment.pk])
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            Payment.all_objects.update(amount=D("1"))
+        self.assertEqual(Payment.all_objects.get().amount, payment.amount)
 
 
 class VoidTests(SalesAPITestCase):

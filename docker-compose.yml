@@ -43,6 +43,8 @@ services:
     environment:
       # Called from the browser, so this is the host-mapped backend port.
       VITE_API_URL: http://localhost:8000/api/v1
+      # Put in links people are sent; the live site, as in production.
+      VITE_APP_URL: https://bbm.mauzo.tz
     depends_on:
       - backend
 

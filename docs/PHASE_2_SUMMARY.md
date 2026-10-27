@@ -132,8 +132,8 @@ All lists are paginated: `?page=`, and `?page_size=` up to 100, default 25.
 - **Frontend:** products list states, product form validation and server errors, image pre-check, adjust-stock dialog, nav permissions, formatters.
 
 ## 9. Known gaps
-- [ ] `QuerySet.update()` and `bulk_create()` on `StockMovement` bypass the immutability and tenant checks, which only run in `save()`. Code review is the only guard; DB triggers could be added before going live.
-- [ ] Uploaded media is served by Django only in DEBUG. Production needs object storage (`STORAGES` / django-storages) or nginx in front. Image URLs aren't authenticated; the random file names are the only protection.
+- [x] ~~`QuerySet.update()` bypasses immutability.~~ Closed: a Postgres trigger (`inventory/0003_immutable_trigger`) refuses every UPDATE and DELETE. `bulk_create()` still skips the tenant checks in `save()`; don't use it on `StockMovement`.
+- [x] ~~Media served only in DEBUG.~~ In production nginx serves `/media/` from the shared volume (see `docs/DEPLOYMENT.md`); image URLs are still unauthenticated, protected by random names.
 - [ ] `TRANSFER` is reserved; there are no stock locations yet.
 - [ ] Overselling override (FR-13) and FEFO batch consumption arrive with sales in Phase 3.
 - [ ] Batch cost isn't stored. Phase 3 COGS will snapshot the product's `cost_price` at sale time, as the SRS says.

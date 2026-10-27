@@ -3,16 +3,29 @@ sale snapshots (never current prices) for revenue and cost, the payment
 ledger for cash, expenses by date, and the stock ledger for what's on the
 shelf. Every function returns {"rows": [...], "totals": {...}}."""
 
+from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Case, Count, DateField, DecimalField, ExpressionWrapper, F, Sum, When
-from django.db.models.functions import Trunc
+from django.db.models import (
+    Case,
+    Count,
+    DateField,
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Subquery,
+    Sum,
+    When,
+)
+from django.db.models.functions import Coalesce, Round, Trunc
 from django.utils import timezone
 
 from catalog.models import Product, ProductBatch
 from expenses.models import Expense
 from inventory.services import with_batch_stock, with_product_stock
+from purchases.models import PurchaseItem
 from sales.models import Payment, Sale
 
 ZERO = Decimal("0.00")
@@ -178,16 +191,41 @@ def expenses_report(date_from, date_to, period):
 
 # ---- stock reports ---------------------------------------------------------------
 
+def with_batch_cost(batches):
+    """Annotate unit_cost: what each batch cost, i.e. the average paid on the
+    received purchases that filled it (Σ line_total / Σ quantity; a line's
+    batch is set only on receiving). Stock with no purchase behind it
+    (opening stock, adjustments) falls back to the product's cost price."""
+    paid = (
+        PurchaseItem.objects.filter(batch=OuterRef("pk"))
+        .order_by()
+        .values("batch")
+        .annotate(cost=Round(Sum("line_total") / Sum("quantity"), 2))
+        .values("cost")
+    )
+    return batches.annotate(
+        unit_cost=Coalesce(Subquery(paid, output_field=MONEY), F("product__cost_price"), output_field=MONEY)
+    )
+
+
+def _cost_values_by_product():
+    """{product id: Σ batch stock × batch cost} over batches holding stock."""
+    batches = with_batch_cost(with_batch_stock(ProductBatch.objects.all())).filter(stock_on_hand__gt=0)
+    values = defaultdict(lambda: ZERO)
+    for batch in batches.values("product", "stock_on_hand", "unit_cost"):
+        values[batch["product"]] += batch["stock_on_hand"] * batch["unit_cost"]
+    return values
+
+
 def stock_valuation_report():
-    """Every product that holds stock (archived ones too), valued at its
-    current cost and selling price. Cost value uses the product's latest cost
-    price, not what each batch cost (a known gap: received batches' costs are
-    on their PurchaseItem, opening stock and adjustments have none)."""
+    """Every product that holds stock (archived ones too), valued at what
+    each of its batches cost (see with_batch_cost) and at its current
+    selling price."""
+    cost_values = _cost_values_by_product()
     products = (
         with_product_stock(Product.objects.select_related("category"))
         .filter(stock_on_hand__gt=0)
         .annotate(
-            cost_value=ExpressionWrapper(F("stock_on_hand") * F("cost_price"), output_field=VALUE),
             retail_value=ExpressionWrapper(F("stock_on_hand") * F("selling_price"), output_field=VALUE),
         )
         .order_by("name")
@@ -203,7 +241,7 @@ def stock_valuation_report():
             "stock_on_hand": p.stock_on_hand,
             "cost_price": p.cost_price,
             "selling_price": p.selling_price,
-            "cost_value": p.cost_value,
+            "cost_value": cost_values[p.pk],
             "retail_value": p.retail_value,
         }
         for p in products
@@ -215,24 +253,21 @@ def stock_valuation_report():
 
 def expiry_report(within_days, today=None):
     """Batches that still hold stock and are expired or expire within
-    `within_days`, soonest first, valued at the product's latest cost price.
-    Archived products are included: their expired stock still needs writing
-    off."""
+    `within_days`, soonest first, valued at what each batch cost (see
+    with_batch_cost). Archived products are included: their expired stock
+    still needs writing off."""
     today = today or timezone.localdate()
-    batches = (
+    batches = with_batch_cost(
         with_batch_stock(
             ProductBatch.objects.filter(
                 expiry_date__isnull=False,
                 expiry_date__lte=today + timedelta(days=within_days),
             )
         )
-        .filter(stock_on_hand__gt=0)
-        .select_related("product")
-        .order_by("expiry_date", "product__name")
-    )
+    ).filter(stock_on_hand__gt=0).select_related("product").order_by("expiry_date", "product__name")
     rows = []
     for batch in batches:
-        cost_value = batch.stock_on_hand * batch.product.cost_price
+        cost_value = batch.stock_on_hand * batch.unit_cost
         rows.append(
             {
                 "batch": batch.pk,
@@ -245,7 +280,7 @@ def expiry_report(within_days, today=None):
                 "status": "expired" if batch.expiry_date < today else "expiring",
                 "is_active": batch.product.is_active,
                 "stock_on_hand": batch.stock_on_hand,
-                "cost_price": batch.product.cost_price,
+                "cost_price": batch.unit_cost,
                 "cost_value": cost_value,
             }
         )

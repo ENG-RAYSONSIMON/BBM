@@ -8,8 +8,9 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics
 from rest_framework.response import Response
 
-from accounts.rbac import REPORTS_EXPORT, REPORTS_VIEW
+from accounts.rbac import EXPENSES_VIEW, FINANCE_VIEW, REPORTS_EXPORT, REPORTS_VIEW
 from audit.services import Action, record
+from core.permissions import has_permission
 
 from . import services
 from .serializers import (
@@ -95,6 +96,8 @@ class ReportView(generics.GenericAPIView):
     kind = None
     query_serializer_class = PeriodQuerySerializer
     required_permissions = (REPORTS_VIEW,)
+    # Buying cost and profit columns, left out without finance.view.
+    finance_columns = ()
 
     def params(self):
         query = self.query_serializer_class(data=self.request.query_params)
@@ -120,13 +123,17 @@ class ExportMixin:
     """Same report as CSV (UTF-8 with BOM so Excel shows Kiswahili text
     right). Every download is audit-logged (FR-20)."""
 
-    # Downloading is viewing too: a role needs both.
-    required_permissions = (REPORTS_VIEW, REPORTS_EXPORT)
+    @property
+    def required_permissions(self):
+        # Downloading is viewing too: a role needs both.
+        return (*super().required_permissions, REPORTS_EXPORT)
 
     def get(self, request):
         params = self.params()
         report = self.build(params)
         columns = COLUMNS[self.kind]
+        if not has_permission(request, FINANCE_VIEW):
+            columns = [column for column in columns if column[0] not in self.finance_columns]
         buffer = io.StringIO()
         buffer.write("﻿")
         writer = csv.writer(buffer)
@@ -153,6 +160,7 @@ class SalesReportView(PeriodReportView):
     kind = "sales"
     report = services.sales_report
     serializer_class = SalesReportSerializer
+    finance_columns = ("cogs", "gross_profit")
 
 
 @extend_schema(tags=["reports"], summary="Profit report: gross profit, expenses and net profit", **PERIOD_PARAMS)
@@ -160,6 +168,8 @@ class ProfitReportView(PeriodReportView):
     kind = "profit"
     report = services.profit_report
     serializer_class = ProfitReportSerializer
+    # Profit, and the expenses taken off it.
+    required_permissions = (REPORTS_VIEW, FINANCE_VIEW, EXPENSES_VIEW)
 
 
 @extend_schema(tags=["reports"], summary="Expenses report by period and category", **PERIOD_PARAMS)
@@ -167,12 +177,14 @@ class ExpensesReportView(PeriodReportView):
     kind = "expenses"
     report = services.expenses_report
     serializer_class = ExpensesReportSerializer
+    required_permissions = (REPORTS_VIEW, EXPENSES_VIEW)
 
 
 @extend_schema(tags=["reports"], summary="Stock valuation: what's on the shelf at cost and selling price")
 class StockValuationReportView(ReportView):
     kind = "stock-valuation"
     serializer_class = StockValuationReportSerializer
+    required_permissions = (REPORTS_VIEW, FINANCE_VIEW)
 
     def params(self):
         return {}
@@ -190,6 +202,7 @@ class ExpiryReportView(ReportView):
     kind = "expiry"
     query_serializer_class = ExpiryQuerySerializer
     serializer_class = ExpiryReportSerializer
+    required_permissions = (REPORTS_VIEW, FINANCE_VIEW)
 
     def build(self, params):
         return services.expiry_report(params["within_days"])

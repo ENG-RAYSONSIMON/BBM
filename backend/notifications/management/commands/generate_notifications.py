@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from accounts.models import Business
+from core.heartbeat import beat
 from core.tenancy import tenant_context
 from notifications.services import sync_stock_notifications
 
@@ -29,3 +30,4 @@ class Command(BaseCommand):
         self.stdout.write(f"Notifications: {opened} opened, {resolved} resolved, {updated} updated.")
         if failed:
             raise CommandError(f"Failed for {len(failed)} business(es).")
+        beat()

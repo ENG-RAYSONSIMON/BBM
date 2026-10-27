@@ -1,6 +1,6 @@
 import random
 
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models import Sum
 from django.test import TestCase
 
@@ -40,6 +40,21 @@ class LedgerTests(TestCase):
             with self.assertRaises(LedgerImmutable), transaction.atomic():
                 StockMovement.objects.all().delete()
         self.assertEqual(StockMovement.all_objects.count(), 1)
+
+    def test_database_refuses_changes_past_the_orm(self):
+        movement = self.movement()
+        statements = [
+            "UPDATE inventory_stockmovement SET quantity = 500 WHERE id = %s",
+            "DELETE FROM inventory_stockmovement WHERE id = %s",
+        ]
+        for sql in statements:
+            with self.subTest(sql), self.assertRaises(DatabaseError), transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, [movement.pk])
+        # QuerySet.update() skips save(); the trigger still catches it.
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            StockMovement.all_objects.update(quantity=500)
+        self.assertEqual(StockMovement.all_objects.get().quantity, 5)
 
     def test_database_enforces_quantity_signs(self):
         batch = stock(self.business, self.product, 5, self.user)

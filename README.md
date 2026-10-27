@@ -90,6 +90,10 @@ See `docs/PHASE_2_SUMMARY.md`.
   products and stock, purchases and expenses, with costs and profit, but no
   deletes, voids, reports, settings or staff. See `docs/PHASE_4_SUMMARY.md`,
   step 4.
+- Gap fixes: profit, stock-value and expiry reports need `finance.view`; the
+  audit log is also locked by a database trigger; staff name and phone can be
+  edited; sellers get a "my sales today" tile; stock is valued at what each
+  batch cost. Links people are sent point to `https://bbm.mauzo.tz`.
 
 **Languages: Kiswahili (default) and English.** A language button next to the
 theme button switches the whole app, including server error messages. See §7.
@@ -194,9 +198,11 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 REDIS_URL=redis://redis:6379/0               # throttle counters; LocMem if unset
 
 # Optional (defaults shown). None of these are secrets.
-# FRONTEND_URL=http://localhost:5173        # base of the password-reset link
+# FRONTEND_URL=https://bbm.mauzo.tz         # base of the password-reset link
 # PASSWORD_RESET_TIMEOUT=1800               # reset token lifetime, seconds
 # PASSWORD_RESET_THROTTLE_RATE=5/hour       # per IP, both reset endpoints
+# NOTIFICATION_RETENTION_DAYS=90            # cleanup deletes resolved notifications older than this
+# SCHEDULER_HEARTBEAT_FILE=                 # set in production; empty turns the heartbeat off
 # LOGIN_THROTTLE_RATE=10/min                # per IP
 # REGISTER_THROTTLE_RATE=5/hour             # per IP
 # TOKEN_REFRESH_THROTTLE_RATE=30/min        # per IP
@@ -320,7 +326,10 @@ docker compose down -v              # also DELETES the volumes: the database (al
   `docker-compose.yml`. If you change the backend port, also update
   `VITE_API_URL`.
 - **Password-reset email.** It isn't sent; the link is printed in
-  `docker compose logs backend`.
+  `docker compose logs backend`. Links people are sent (reset links,
+  `FRONTEND_URL`; staff login details, `VITE_APP_URL`) point to the live site
+  `https://bbm.mauzo.tz` even in development. To try a reset locally, open
+  `http://localhost:5173/reset-password#token=…` with the printed token.
 
 ## 3. Migrations and an admin user
 
@@ -352,7 +361,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (282 tests)
+docker compose exec backend python manage.py test            # whole suite (296 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -371,7 +380,7 @@ docker compose exec backend python manage.py check
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (110 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, staff, languages
+docker compose exec frontend npm test         # Vitest (113 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, staff, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```

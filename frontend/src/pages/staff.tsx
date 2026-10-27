@@ -29,13 +29,13 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useTranslateMessage } from '@/i18n'
-import { api } from '@/lib/api'
+import { api, APP_URL } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { formatDateTime } from '@/lib/format'
 import { applyServerErrors } from '@/lib/forms'
 import { makeTempPassword, roleLabel } from '@/lib/roles'
-import { staffPasswordSchema, staffSchema } from '@/lib/schemas'
-import type { StaffPasswordValues, StaffValues } from '@/lib/schemas'
+import { staffEditSchema, staffPasswordSchema, staffSchema } from '@/lib/schemas'
+import type { StaffEditValues, StaffPasswordValues, StaffValues } from '@/lib/schemas'
 import type { Paginated, Role, StaffMember } from '@/lib/types'
 import { toQuery, useListParams } from '@/lib/use-list-params'
 
@@ -249,7 +249,7 @@ function LoginDetails({ email, password }: { email: string; password: string }) 
   const { t } = useTranslation()
   const text = t('staff.loginDetailsText', {
     business: me?.business.name ?? '',
-    url: window.location.origin,
+    url: APP_URL,
     email,
     password,
   })
@@ -353,7 +353,7 @@ function AddStaffDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   )
 }
 
-/** Change role, turn access off/on, or give a new temporary password. */
+/** Change name, phone or role, turn access off/on, or give a new temporary password. */
 function ManageStaffDialog({ member, onOpenChange }: { member: StaffMember; onOpenChange: (open: boolean) => void }) {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
@@ -361,19 +361,26 @@ function ManageStaffDialog({ member, onOpenChange }: { member: StaffMember; onOp
   const [view, setView] = useState<'edit' | 'reset' | { password: string }>('edit')
   const name = personName(member)
 
-  const editForm = useForm<{ role: string; is_active: boolean }>({
-    defaultValues: { role: member.role, is_active: member.is_active },
+  const editForm = useForm<StaffEditValues>({
+    resolver: zodResolver(staffEditSchema),
+    defaultValues: {
+      first_name: member.first_name,
+      last_name: member.last_name,
+      phone: member.phone,
+      role: member.role,
+      is_active: member.is_active,
+    },
   })
   const resetForm = useForm<StaffPasswordValues>({
     resolver: zodResolver(staffPasswordSchema),
     defaultValues: { temp_password: '' },
   })
 
-  async function saveChanges(values: { role: string; is_active: boolean }) {
+  async function saveChanges(values: StaffEditValues) {
     try {
       await api(`/staff/${member.id}/`, { method: 'PATCH', body: values })
     } catch (error) {
-      applyServerErrors(error, editForm.setError, ['role', 'is_active'])
+      applyServerErrors(error, editForm.setError, ['first_name', 'last_name', 'phone', 'role', 'is_active'])
       return
     }
     await queryClient.invalidateQueries({ queryKey: ['staff'] })
@@ -413,6 +420,14 @@ function ManageStaffDialog({ member, onOpenChange }: { member: StaffMember; onOp
           <>
             <form id="manage-staff" className="grid gap-4" noValidate onSubmit={editForm.handleSubmit(saveChanges)}>
               <FormError message={editErrors.root?.server?.message} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label={t('auth.firstName')} error={editErrors.first_name?.message}
+                  {...editForm.register('first_name')} />
+                <FormField label={t('auth.lastName')} error={editErrors.last_name?.message}
+                  {...editForm.register('last_name')} />
+              </div>
+              <FormField label={t('auth.phoneOptional')} type="tel" error={editErrors.phone?.message}
+                {...editForm.register('phone')} />
               <RoleField control={editForm.control} name="role" roles={roles.data} error={editErrors.role?.message} />
               <Controller
                 control={editForm.control}

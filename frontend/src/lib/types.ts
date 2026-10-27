@@ -254,6 +254,14 @@ export type SaleDetail = Sale & {
   void_reason: string
 }
 
+/** GET /sales/my-summary/: the caller's own sales today, no cost or profit. */
+export type MySalesSummary = {
+  date: string
+  sales_count: number
+  revenue: string
+  cash_collected: string
+}
+
 export type SalesSummary = {
   date_from: string
   date_to: string
@@ -399,8 +407,10 @@ export type SalesReportRow = {
   sales_count: number
   revenue: string
   discounts: string
-  cogs: string
-  gross_profit: string
+  /** Left out without finance.view. */
+  cogs?: string
+  /** Left out without finance.view. */
+  gross_profit?: string
   cash_collected: string
 }
 export type SalesReport = PeriodReport<SalesReportRow, Omit<SalesReportRow, 'period'>>

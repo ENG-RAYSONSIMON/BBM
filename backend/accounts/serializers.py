@@ -297,6 +297,9 @@ class StaffCreateSerializer(serializers.Serializer):
 
 
 class StaffUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
+    last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
+    phone = serializers.CharField(max_length=20, allow_blank=True, required=False)
     role = _role_field(required=False)
     is_active = serializers.BooleanField(required=False, help_text="False turns their access off.")
 

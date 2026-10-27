@@ -13,6 +13,10 @@ export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/a
   '',
 )
 
+/** The app's public address, used in links people are sent (e.g. staff
+ * login details). The live site even in development, so those links work. */
+export const APP_URL = (import.meta.env.VITE_APP_URL ?? 'https://bbm.mauzo.tz').replace(/\/$/, '')
+
 const REFRESH_KEY = 'bbm.refresh'
 
 export type ApiErrorData = Record<string, unknown> | null

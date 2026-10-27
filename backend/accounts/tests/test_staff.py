@@ -204,6 +204,29 @@ class AccessTests(StaffTestCase):
         self.owner_b.refresh_from_db()
         self.assertTrue(self.owner_b.check_password(PASSWORD))
 
+    def test_name_and_phone_can_be_changed_and_are_audit_logged(self):
+        response = self.client.patch(
+            detail_url(self.pk), {"first_name": "Neema", "last_name": "Juma", "phone": "0712345678"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data["last_name"], response.data["phone"]), ("Juma", "0712345678"))
+        with tenant_context(self.business_a):
+            entry = AuditLog.objects.filter(action=AuditLog.Action.STAFF_CHANGE).get()
+        # Only what changed: the first name was already Neema.
+        self.assertEqual(entry.changes, {"last_name": ["", "Juma"], "phone": ["", "0712345678"]})
+
+    def test_name_change_refused_for_an_account_used_elsewhere(self):
+        with tenant_context(self.business_a):
+            pk = UserRole.objects.create(user=self.owner_b, role=self.roles[Role.SELLER]).pk
+        name = self.owner_b.first_name
+        response = self.client.patch(detail_url(pk), {"first_name": "Changed"}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.owner_b.refresh_from_db()
+        self.assertEqual(self.owner_b.first_name, name)
+        # Their role here can still be changed.
+        role = str(self.roles[Role.CASHIER].pk)
+        self.assertEqual(self.client.patch(detail_url(pk), {"role": role}, format="json").status_code, 200)
+
     def test_platform_operators_are_left_to_django_admin(self):
         self.neema.is_staff = True
         self.neema.save()
@@ -231,6 +254,7 @@ class IsolationTests(StaffTestCase):
         self.as_user(self.owner_b, self.business_b)
         self.assertEqual(self.client.get(detail_url(pk)).status_code, 404)
         self.assertEqual(self.client.patch(detail_url(pk), {"is_active": False}, format="json").status_code, 404)
+        self.assertEqual(self.client.patch(detail_url(pk), {"first_name": "X"}, format="json").status_code, 404)
         self.assertEqual(self.client.post(reset_url(pk), {"temp_password": TEMP}, format="json").status_code, 404)
         self.assertEqual([r["email"] for r in self.client.get(STAFF_URL).data["results"]], ["b@example.com"])
         with tenant_context(self.business_a):

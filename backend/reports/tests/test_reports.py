@@ -4,6 +4,7 @@ audit-logged; permissions and tenant isolation."""
 
 import csv
 import io
+from unittest import mock
 from datetime import date, datetime, timedelta
 from datetime import timezone as dt_timezone
 
@@ -13,12 +14,12 @@ from django.utils import timezone
 
 from accounts.models import Role, RolePermission
 from audit.models import AuditLog
-from catalog.models import Product
+from catalog.models import Product, Supplier
 from catalog.tests.helpers import days, make_member, make_product, stock, today
 from core.tenancy import tenant_context
 from expenses.models import Expense, ExpenseCategory
 from reports.services import period_starts
-from sales.models import Payment, Sale
+from sales.models import Sale
 from sales.tests.helpers import D, SalesAPITestCase
 
 
@@ -42,10 +43,12 @@ class PeriodStartsTests(SimpleTestCase):
 class ReportsTestCase(SalesAPITestCase):
     """Shea Butter sells at 12,000 and cost 8,000 (10 in stock)."""
 
-    def backdate(self, sale_id, n_days):
+    def sell_days_ago(self, n_days, **kwargs):
+        """A sale and its payment made n_days ago. Payments are append-only
+        (a DB trigger refuses updates), so the clock moves instead."""
         when = timezone.now() - timedelta(days=n_days)
-        Sale.all_objects.filter(pk=sale_id).update(created_at=when)
-        Payment.all_objects.filter(sale_id=sale_id).update(created_at=when)
+        with mock.patch("django.utils.timezone.now", return_value=when):
+            return self.sell(**kwargs)
 
     def expense(self, amount, category="Rent", expense_date=None):
         with tenant_context(self.business_a):
@@ -63,8 +66,7 @@ class SalesAndProfitReportTests(ReportsTestCase):
         super().setUp()
         self.sell()  # today: 12,000 revenue, 8,000 cost, paid
         self.sell(amount_received="0", new_customer={"name": "Neema"})  # today, on credit
-        old = self.sell().data["id"]
-        self.backdate(old, 3)
+        self.sell_days_ago(3)
         voided = self.sell().data["id"]
         self.client.post(reverse("sales:sale-void", args=[voided]), {"reason": "Wrong"}, format="json")
 
@@ -167,6 +169,37 @@ class StockReportsTests(ReportsTestCase):
         self.assertEqual(data["totals"]["product_count"], 1)
         self.assertEqual(data["as_of"], today().isoformat())
 
+    def receive_purchase(self, quantity, unit_cost, batch_number, expiry):
+        with tenant_context(self.business_a):
+            supplier, _ = Supplier.objects.get_or_create(name="Dar Cosmetics")
+        line = {
+            "product": str(self.product.pk), "quantity": quantity, "unit_cost": unit_cost,
+            "batch_number": batch_number, "expiry_date": days(expiry).isoformat(),
+        }
+        draft = self.client.post(
+            reverse("purchases:purchase-list"), {"supplier": str(supplier.pk), "items": [line]}, format="json"
+        )
+        self.assertEqual(draft.status_code, 201, draft.data)
+        received = self.client.post(reverse("purchases:purchase-receive", args=[draft.data["id"]]))
+        self.assertEqual(received.status_code, 200, received.data)
+
+    def test_stock_is_valued_at_what_each_batch_cost(self):
+        # 10 opening units (no purchase), then P1 bought twice and P2 once.
+        self.receive_purchase(5, "7000", "P1", 30)
+        self.receive_purchase(5, "8000", "P1", 30)
+        self.receive_purchase(5, "9000", "P2", 40)  # the cost price is now 9,000
+
+        [row] = self.client.get(url("stock-valuation")).data["rows"]
+        self.assertEqual(row["stock_on_hand"], 25)
+        # Opening stock at the cost price (10 × 9,000), P1 at its average
+        # (10 × 7,500), P2 at what it cost (5 × 9,000); not 25 × 9,000.
+        self.assertEqual(D(row["cost_value"]), D("210000"))
+
+        rows = {r["batch_number"]: r for r in self.client.get(url("expiry")).data["rows"]}
+        self.assertEqual(D(rows["P1"]["cost_price"]), D("7500"))
+        self.assertEqual(D(rows["P1"]["cost_value"]), D("75000"))
+        self.assertEqual(D(rows["P2"]["cost_value"]), D("45000"))
+
     def test_expiry_lists_expired_and_soon_expiring_batches(self):
         stock(self.business_a, self.product, 2, self.owner_a, batch_number="OLD", expiry_date=days(-5))
         stock(self.business_a, self.product, 3, self.owner_a, batch_number="SOON", expiry_date=days(20))
@@ -248,10 +281,8 @@ class PermissionTests(ReportsTestCase):
             role = Role.objects.get(name="Clerk")
             RolePermission.objects.create(role=role, permission_id=self._perm("reports.view"))
         self.as_user(clerk, self.business_a)
-        for kind in ("sales", "profit", "expenses", "stock-valuation", "expiry"):
-            with self.subTest(kind):
-                self.assertEqual(self.client.get(url(kind)).status_code, 200)
-                self.assertEqual(self.client.get(url(kind, export=True)).status_code, 403)
+        self.assertEqual(self.client.get(url("sales")).status_code, 200)
+        self.assertEqual(self.client.get(url("sales", export=True)).status_code, 403)
 
         # Export alone isn't enough: downloading is viewing too.
         exporter = make_member(self.business_a, "exporter@example.com", "Exporter")
@@ -266,6 +297,57 @@ class PermissionTests(ReportsTestCase):
         for kind in ("sales", "profit", "expenses", "stock-valuation", "expiry"):
             with self.subTest(kind):
                 self.assertEqual(self.client.get(url(kind)).status_code, 403)
+
+    def test_cost_and_profit_need_finance_view(self):
+        self.sell()
+        viewer = make_member(self.business_a, "viewer@example.com", "Viewer")
+        with tenant_context(self.business_a):
+            role = Role.objects.get(name="Viewer")
+            for codename in ("reports.view", "reports.export"):
+                RolePermission.objects.create(role=role, permission_id=self._perm(codename))
+        self.as_user(viewer, self.business_a)
+
+        # Reports that are all about cost or profit are refused, JSON and CSV.
+        for kind in ("profit", "stock-valuation", "expiry"):
+            with self.subTest(kind):
+                self.assertEqual(self.client.get(url(kind)).status_code, 403)
+                self.assertEqual(self.client.get(url(kind, export=True)).status_code, 403)
+
+        # The sales report still works, without its cost and profit.
+        data = self.client.get(url("sales")).data
+        self.assertEqual(data["totals"]["sales_count"], 1)
+        for part in (data["totals"], *data["rows"]):
+            self.assertNotIn("cogs", part)
+            self.assertNotIn("gross_profit", part)
+        header = next(csv.reader(io.StringIO(self.client.get(url("sales", export=True)).content.decode("utf-8-sig"))))
+        self.assertIn("Revenue (TZS)", header)
+        self.assertNotIn("Cost of goods sold (TZS)", header)
+        self.assertNotIn("Gross profit (TZS)", header)
+
+        # With finance.view they come back; profit also takes off expenses.
+        with tenant_context(self.business_a):
+            RolePermission.objects.create(role=role, permission_id=self._perm("finance.view"))
+        self.assertIn("gross_profit", self.client.get(url("sales")).data["totals"])
+        self.assertEqual(self.client.get(url("profit")).status_code, 403)
+        with tenant_context(self.business_a):
+            RolePermission.objects.create(role=role, permission_id=self._perm("expenses.view"))
+        self.assertEqual(self.client.get(url("profit")).status_code, 200)
+
+    def test_spending_needs_expenses_view(self):
+        viewer = make_member(self.business_a, "viewer@example.com", "Viewer")
+        with tenant_context(self.business_a):
+            role = Role.objects.get(name="Viewer")
+            for codename in ("reports.view", "reports.export", "finance.view"):
+                RolePermission.objects.create(role=role, permission_id=self._perm(codename))
+        self.as_user(viewer, self.business_a)
+        for kind in ("expenses", "profit"):
+            with self.subTest(kind):
+                self.assertEqual(self.client.get(url(kind)).status_code, 403)
+                self.assertEqual(self.client.get(url(kind, export=True)).status_code, 403)
+        with tenant_context(self.business_a):
+            RolePermission.objects.create(role=role, permission_id=self._perm("expenses.view"))
+        self.assertEqual(self.client.get(url("expenses")).status_code, 200)
+        self.assertEqual(self.client.get(url("expenses", export=True)).status_code, 200)
 
     def _perm(self, codename):
         from accounts.models import Permission
