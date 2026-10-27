@@ -66,12 +66,21 @@ describe('DashboardPage', () => {
     expect(screen.queryByText("Today's net profit")).not.toBeInTheDocument()
   })
 
-  it("doesn't ask a seller for everyone's totals", async () => {
-    const fetchMock = mockFetch({})
+  it("shows a seller their own day, not everyone's totals", async () => {
+    const fetchMock = mockFetch({
+      'GET /sales/my-summary/': {
+        status: 200,
+        body: { date: '2026-10-10', sales_count: 2, revenue: '24000.00', cash_collected: '20000.00' },
+      },
+    })
     renderWithAuth('/dash', { '/dash': <DashboardPage /> }, ['sales.view', 'sales.create'])
-    expect(await screen.findByText(/Welcome/)).toBeInTheDocument()
+    expect(await screen.findByText('24,000', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('My sales today')).toBeInTheDocument()
+    expect(screen.getByText('2 sales')).toBeInTheDocument()
+    expect(screen.getByText('Cash I took in today')).toBeInTheDocument()
     expect(screen.queryByText("Today's sales")).not.toBeInTheDocument()
-    expect(fetchMock.calls).toHaveLength(0)
+    expect(screen.queryByText(/gross profit|net profit/i)).not.toBeInTheDocument()
+    expect(fetchMock.calls.map((c) => c.key)).toEqual(['GET /sales/my-summary/'])
   })
 
   it('hides sales figures without sales.view', async () => {

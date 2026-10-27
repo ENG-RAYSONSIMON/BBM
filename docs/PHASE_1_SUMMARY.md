@@ -341,9 +341,7 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
 - [x] `/auth/login/` (scope `login`, `10/min`) and `/auth/refresh/` (scope
       `token_refresh`, `30/min`) are rate limited per IP. Rates are overridable
       via env (see `backend/.env.example`). Behind nginx, set DRF `NUM_PROXIES`.
-- [ ] Outstanding and blacklisted token rows grow without limit. Nothing runs
-      SimpleJWT's `flushexpiredtokens` yet; it needs a cron/management-command
-      schedule before Phase 4 Celery.
+- [x] ~~Expired token rows grow without limit.~~ Closed: `manage.py cleanup` (daily, scheduler) runs `flushexpiredtokens`.
 - [ ] The refresh membership check depends on deviation 2 (only that one route).
 
 ### Against FR-3 (tenant scoping)
@@ -352,20 +350,15 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       docstring), and `QuerySet.update(business=...)` (which `editable=False`
       doesn't block). Code review is the only guard; there is no lint rule or
       DB-level row security.
-- [ ] No cross-tenant **endpoint** tests yet (NFR-7: "guess a valid UUID").
-      That's because there are no tenant-owned CRUD endpoints yet. Every
-      Phase 2 detail/update/delete endpoint needs one.
+- [x] ~~No cross-tenant endpoint tests.~~ Every app has a `test_isolation.py` since Phase 2.
 - [ ] Every authenticated request costs one extra membership query
       (`select_related` business + role). There is no caching.
-- [ ] Future background jobs (Celery, Phase 4) must wrap work in
-      `tenant_context()`. The ContextVar doesn't carry into tasks.
+- [x] Background jobs wrap work in `tenant_context()` per business (`generate_notifications`, `cleanup`).
 
 ### Other Phase 1 items in the SRS that are not built
 - [x] **FR-4, password reset** — see §7.
 - [x] **FR-5, table-driven permissions** — see §8.
-- [ ] No staff/membership management endpoints (inviting an Admin, changing a
-      role, deactivating a member). `UserRole.is_active` can only be toggled
-      from Django admin.
+- [x] ~~No staff management.~~ Built in Phase 4 step 4 (`/staff`).
 - [x] Frontend (`frontend/`): register, login (business picker), forgot/reset
       password, dashboard with empty states, settings. Access token in memory,
       refresh token in `localStorage`.
@@ -379,10 +372,8 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       --validate --fail-on-warn` is clean; `accounts/tests/test_schema.py`
       fails on any schema warning or error and checks the DEBUG-only routing.
 - [x] `.env.example` and `backend/.env.example` exist (`REPLACE_ME` placeholders).
-- [ ] No CI (NFR-11).
-- [ ] `docker-compose.yml` has a dev `frontend` service but no `nginx`, and no db
-      healthcheck (`depends_on` is start order only). The backend runs Django's
-      `runserver`.
+- [x] ~~No CI.~~ `.github/workflows/publish-images.yml` runs the deploy, backend and frontend checks before publishing images.
+- [x] ~~No nginx or healthchecks.~~ `compose.production.yml` has nginx, gunicorn and healthchecks; `docker-compose.yml` stays a dev setup.
 - [ ] Minor: `User.email` has both `unique=True` and the `Lower(email)` unique
       constraint, so two unique indexes. The case-insensitive one is enough.
 - [ ] Minor: `UserRole.save()` with no `role` set raises
@@ -427,8 +418,7 @@ stored as `Business.currency`, and `BusinessSettings` has no currency field.
       send in the request). Moves off-request with Celery in Phase 4.
 - [x] Throttle counters live in Redis when `REDIS_URL` is set (LocMem
       fallback otherwise, per-process).
-- [ ] Used/expired token rows are never deleted; add to the same cron as
-      `flushexpiredtokens`.
+- [x] ~~Used/expired reset tokens are never deleted.~~ Closed: `manage.py cleanup` deletes them daily.
 - [ ] Real SMTP not configured. When it is, credentials come from env with
       `REPLACE_ME` placeholders, never literals in settings.
 

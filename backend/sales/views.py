@@ -27,6 +27,7 @@ from core.views import TenantModelViewSet
 from .models import Customer, Sale
 from .serializers import (
     CustomerSerializer,
+    MySalesSummarySerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
     SaleCreateSerializer,
@@ -37,6 +38,7 @@ from .serializers import (
 )
 from .services import (
     create_sale,
+    my_sales_today,
     record_payment,
     sales_summary,
     void_sale,
@@ -221,6 +223,18 @@ class SaleVoidView(SaleActionView):
         serializer.is_valid(raise_exception=True)
         _service_call(void_sale, sale=sale, user=request.user, **serializer.validated_data)
         return Response(_sale_detail(sale.pk, self.get_serializer_context()))
+
+
+@extend_schema(tags=["sales"], summary="Your own sales and cash today", responses=MySalesSummarySerializer)
+class MySalesSummaryView(generics.GenericAPIView):
+    """A seller's "my sales today" tile. Only the caller's own sales, and no
+    cost or profit, so a plain sales.view is enough."""
+
+    serializer_class = MySalesSummarySerializer
+    required_permissions = (SALES_VIEW,)
+
+    def get(self, request):
+        return Response(MySalesSummarySerializer(my_sales_today(request.user)).data)
 
 
 @extend_schema(

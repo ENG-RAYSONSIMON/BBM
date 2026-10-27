@@ -79,6 +79,9 @@ if "pg_dump" in command or "tar -C /app -czf" in command:
         )
         self.assertTrue(any("manage.py migrate --noinput" in line for line in commands))
         self.assertIn("up -d --wait --wait-timeout 180", commands[-2])
+        # The scheduler is started but never waited for.
+        self.assertTrue(commands[-2].endswith("db redis backend nginx"), commands[-2])
+        self.assertTrue(commands[-3].endswith("up -d scheduler"), commands[-3])
         self.assertEqual((self.app / ".env").stat().st_mode & 0o777, 0o600)
         self.assertFalse((self.release / ".env").exists())
         self.assertFalse((self.release / "docker-auth").exists())

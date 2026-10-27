@@ -297,8 +297,11 @@ class StaffContextMixin:
     ),
     partial_update=extend_schema(
         tags=["staff"],
-        summary="Change a staff member's role or turn their access off/on",
-        description="Not for yourself or the Owner. Turning access off works from their next request.",
+        summary="Change a staff member's role, name or phone, or turn their access off/on",
+        description=(
+            "Not for yourself or the Owner. Turning access off works from their next request. "
+            "Name and phone can't be changed for an account also used at another business."
+        ),
         request=StaffUpdateSerializer,
         responses={200: StaffSerializer, 400: VALIDATION_ERROR, 403: FORBIDDEN},
     ),

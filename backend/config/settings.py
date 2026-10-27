@@ -212,15 +212,33 @@ EXPENSE_RECEIPT_MAX_BYTES = env.int("EXPENSE_RECEIPT_MAX_BYTES", default=5 * 102
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-        # When switching to SMTP, read credentials from env with REPLACE_ME
-        # placeholders in .env, never literal values here.
-    },
-}
+# Development: with EMAIL_HOST set (docker-compose points it at Mailpit),
+# emails go over SMTP to that server; without it they're printed to the
+# console. Production sets a real, authenticated SMTP server
+# (settings_production). Credentials only ever come from env.
+if env("EMAIL_HOST", default=""):
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": env("EMAIL_HOST"),
+                "port": env.int("EMAIL_PORT", default=25),
+                "username": env("EMAIL_HOST_USER", default=""),
+                "password": env("EMAIL_HOST_PASSWORD", default=""),
+                "use_tls": env.bool("EMAIL_USE_TLS", default=False),
+                "timeout": 15,
+            },
+        },
+    }
+else:
+    MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@bbm.local")
 
 # FR-4 password reset
 PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=30 * 60)  # seconds
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+
+# Scheduled jobs (manage.py generate_notifications hourly, cleanup daily)
+NOTIFICATION_RETENTION_DAYS = env.int("NOTIFICATION_RETENTION_DAYS", default=90)
+# Touched after each clean run; the scheduler's healthcheck reads its age. Empty: off.
+SCHEDULER_HEARTBEAT_FILE = env("SCHEDULER_HEARTBEAT_FILE", default="")

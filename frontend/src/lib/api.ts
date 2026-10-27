@@ -13,6 +13,11 @@ export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/a
   '',
 )
 
+/** The app's public address, used in links people are sent (e.g. staff
+ * login details). Production images fix it at build time (VITE_APP_URL);
+ * otherwise it's wherever this app is running, e.g. localhost in development. */
+export const APP_URL = (import.meta.env.VITE_APP_URL || window.location.origin).replace(/\/$/, '')
+
 const REFRESH_KEY = 'bbm.refresh'
 
 export type ApiErrorData = Record<string, unknown> | null

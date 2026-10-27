@@ -83,6 +83,9 @@ install -m 644 "$release/docker-compose.yml" "$app/docker-compose.yml"
 current up -d --wait --wait-timeout 120 db redis
 current run --rm -T backend python manage.py migrate --noinput
 current run --rm -T backend python manage.py collectstatic --noinput
-current up -d --wait --wait-timeout 180
+# The scheduler isn't waited for: a failing job (shown as unhealthy in ps
+# below) must not fail a release whose migrations already ran.
+current up -d scheduler
+current up -d --wait --wait-timeout 180 db redis backend nginx
 current ps
 echo "BBM deployment completed. Verify public HTTPS and real SMTP delivery."

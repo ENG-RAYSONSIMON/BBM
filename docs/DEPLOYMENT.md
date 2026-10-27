@@ -294,13 +294,22 @@ Verify receipt authorization, row counts and images after restoration. Never use
 
 The `scheduler` service runs the backend image with
 `python manage.py generate_notifications` once an hour (FR-19 low-stock and
-expiry alerts). It has no ports and no healthcheck: the loop keeps running even
-if a run fails, so check its logs (`docker compose logs --tail=50 scheduler`) for
-`Notifications: … opened` lines or errors. The command is idempotent, so a run
+expiry alerts; a failed run is retried after 5 minutes), and
+`python manage.py cleanup` at start and then once a day (deletes expired login tokens, used or expired password-reset tokens, and
+resolved notifications older than `NOTIFICATION_RETENTION_DAYS`, default 90).
+It has no ports. Each clean run touches `/tmp/bbm-scheduler-heartbeat`, and the
+healthcheck turns the service **unhealthy** when no run has succeeded for two
+hours, so `docker compose ps` (and Dokploy) show a stuck or failing job.
+`deploy.sh` starts the scheduler but doesn't wait for it to be healthy: a
+failing job must not fail a release whose migrations already ran. Check its
+line in the final `ps` output after each deploy. Its
+logs (`docker compose logs --tail=50 scheduler`) have `Notifications: … opened`
+and `Cleanup: …` lines or the errors. Both commands are idempotent, so a run
 right after a restart or a manual run is harmless:
 
 ```bash
 docker compose exec scheduler python manage.py generate_notifications
+docker compose exec scheduler python manage.py cleanup
 ```
 
 `deploy.sh` stops only nginx and backend before the backup. The scheduler keeps

@@ -78,6 +78,7 @@ jobs:
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           build-args: |
             VITE_API_URL=https://bbmapi.mauzo.tz/api/v1
+            VITE_APP_URL=https://bbm.mauzo.tz
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Record immutable reference

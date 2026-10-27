@@ -4,7 +4,7 @@ Covers **FR-20** (sensitive actions logged, readable only by the Owner) from
 `docs/BBM_SRS_Summary_Draft.pdf`. Reports with CSV export (FR-18) are step 2
 and the notification centre (FR-19) is step 3.
 
-Status as of 2026-10-26: step 1 committed (`a0ac5a8`); steps 2 and 3 follow below.
+Status as of 2026-10-27: step 1 committed (`a0ac5a8`); steps 2–4 and the gap fixes follow below.
 - Backend: 219 tests (203 before, 16 new). The schema validates with `--fail-on-warn`.
 - Frontend: 83 Vitest tests (4 new).
 
@@ -53,7 +53,7 @@ Decisions taken with the product owner:
 ## 5. Known gaps
 
 - [ ] No purge or retention policy; the table only grows. Fine at current volumes.
-- [ ] `QuerySet.update()` and `bulk_update()` on `AuditLog` are refused in Python, but raw SQL could still change rows. A DB trigger would close that before going live.
+- [x] ~~Raw SQL could still change rows.~~ Closed: a Postgres trigger (`audit/0003_immutable_trigger`) refuses every UPDATE and DELETE on `audit_auditlog`.
 - [ ] Creates (new products, sales, etc.) aren't logged; the SRS asks only for sensitive actions.
 - [ ] Product edits (e.g. a price change) and stock adjustments aren't audit-logged; adjustments are already in the stock ledger with who and why.
 - [ ] Deleting a user who has audit entries is refused (`actor` is PROTECT), so who-did-what is never lost.
@@ -107,16 +107,16 @@ JSON answers carry `rows` and `totals` (plus `period`/`date_from`/`date_to`, or 
 
 ## S2.4 Known gaps
 
-- [ ] Stock value and expiry value use each product's latest cost price (said in the API's field help and on the page), not what each batch cost. Received batches' real costs are on their `PurchaseItem`; valuing each batch at that, falling back to the cost price for opening stock and adjustments, is a follow-up.
+- [x] ~~Stock value used each product's latest cost price.~~ Closed: each batch is valued at the average paid on its received purchases (`reports.services.with_batch_cost`), falling back to the product's cost price for opening stock and adjustments.
 - [ ] No outstanding-credit column per period; the dashboard shows what customers owe overall.
-- [ ] The reports permission shows profit and expense figures even to a role without `expenses.view` (the dashboard hides them in that case).
+- [x] ~~Reports showed spending without `expenses.view`.~~ Closed: the expenses and profit reports need `expenses.view` (403 otherwise, JSON and CSV), and the page hides them.
 - [ ] Reports aren't cached; each request queries live data. Fine at single-shop volumes.
 
 ---
 
 # Step 3: notification centre (FR-19)
 
-Status as of 2026-10-26: implemented, not yet committed.
+Status as of 2026-10-26: committed (`65c1d69`).
 - Backend: 255 tests (238 after step 2, 17 new). The schema validates with `--fail-on-warn`.
 - Frontend: 94 Vitest tests (6 new).
 
@@ -161,14 +161,14 @@ Decisions:
 
 - [ ] Alerts appear up to an hour after stock changes (the scheduler interval), not instantly.
 - [ ] No notifications other than stock ones yet (e.g. a customer's credit overdue).
-- [ ] The scheduler has no healthcheck; a run that keeps failing shows only in its logs.
-- [ ] Old resolved notifications are never cleaned up.
+- [x] ~~The scheduler has no healthcheck.~~ Closed: clean runs touch a heartbeat file; the service is unhealthy after two hours without one.
+- [x] ~~Old resolved notifications are never cleaned up.~~ Closed: `manage.py cleanup` deletes those resolved more than `NOTIFICATION_RETENTION_DAYS` (90) ago.
 
 ---
 
 # Step 4: staff accounts (Sellers and Cashiers)
 
-Status as of 2026-10-26: implemented, not yet committed.
+Status as of 2026-10-26: committed (`eca152b`).
 - Backend: 282 tests (255 after step 3, 27 new). The schema validates with `--fail-on-warn`.
 - Frontend: 110 Vitest tests (16 new, including the show-password eye).
 
@@ -222,7 +222,17 @@ Ids are membership (`UserRole`) ids, so another business's staff are 404. Each a
 
 - [ ] No screen to edit what each role may do (the tables allow it; Django admin only).
 - [ ] One account can't work at two shops through the app; that needs an email invite the person accepts.
-- [ ] A staff member's name and phone can't be edited after adding (the account may be shared with another business).
-- [ ] A seller's dashboard has no "my sales today" tile yet.
-- [ ] The reports permission still shows profit to any role holding it, regardless of `finance.view` (only Owner and Admin have it by default).
+- [x] ~~Name and phone can't be edited.~~ Closed: `PATCH /api/v1/staff/{id}/` takes `first_name`, `last_name`, `phone` (audit-logged), refused for an account also used at another business.
+- [x] ~~No "my sales today" tile.~~ Closed: `GET /api/v1/sales/my-summary/` (`sales.view`) gives the caller's own sales and cash today, no cost or profit; sellers see it on the dashboard.
+- [x] ~~Reports showed profit regardless of `finance.view`.~~ Closed: the profit, stock-value and expiry reports need `finance.view` too (403 otherwise, JSON and CSV), and the sales report leaves out `cogs` and `gross_profit` without it.
 
+---
+
+# Gap fixes and production URLs (2026-10-27)
+
+Status: implemented, not yet committed.
+- Backend: 299 tests (282 before, 17 new). Frontend: 113 Vitest tests (3 new). The schema validates with `--fail-on-warn`.
+- Closed the gaps marked [x] above: the audit trigger, staff name/phone edits, the seller's tile, `finance.view` on reports, and stock valued at batch cost.
+- Pre-production hardening: DB triggers make stock movements and payments append-only at the database too; `manage.py cleanup` runs daily from the scheduler; the scheduler has a heartbeat healthcheck; the expenses and profit reports need `expenses.view`; a same-phone customer race is a 400.
+- Password-reset email: translated (en/sw), sent to Mailpit in development and over SMTP in production; a mail failure is logged (error type only) and the answer stays the same 202. Links follow the environment (`FRONTEND_URL`; staff login details use the app's own address, fixed to `https://bbm.mauzo.tz` in production images).
+- [ ] Known gap: the reset email is still sent inside the request, so a request for an existing account takes longer (up to the 15 s SMTP timeout) than for an unknown one. Moving the send to a background job closes this.

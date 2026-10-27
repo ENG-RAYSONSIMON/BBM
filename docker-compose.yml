@@ -26,9 +26,22 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      # Emails go to Mailpit, not the outside world: read them at localhost:8025.
+      EMAIL_HOST: mailpit
+      EMAIL_PORT: "1025"
     depends_on:
       - db
       - redis
+      - mailpit
+
+  # Development inbox: catches every email the backend sends (SMTP on 1025)
+  # and shows it at http://localhost:8025. Nothing is delivered for real.
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      # This machine only: the inbox holds working reset links.
+      - "127.0.0.1:8025:8025"
 
   frontend:
     image: node:24-alpine

@@ -68,17 +68,42 @@ services:
       retries: 3
     logging: *logging
 
-  # FR-19: opens and resolves low-stock and expiry notifications. The command
-  # is idempotent, so hourly runs (and a run right after each restart) are safe.
+  # FR-19: opens and resolves low-stock and expiry notifications hourly
+  # (retried after 5 minutes when a run fails), and once a day deletes
+  # expired tokens and old resolved notifications. Both commands are
+  # idempotent, so a run right after each restart is safe. deploy.sh doesn't
+  # wait for this service.
   scheduler:
     image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to a GHCR tag or digest}
     restart: unless-stopped
     env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings_production
+      SCHEDULER_HEARTBEAT_FILE: /tmp/bbm-scheduler-heartbeat
     # An init process forwards SIGTERM, so stopping doesn't wait for the kill timeout.
     init: true
-    command: ["sh", "-c", "while true; do python manage.py generate_notifications; sleep 3600; done"]
+    command:
+      - sh
+      - -c
+      - |
+        cleaned=""
+        while true; do
+          today=$$(date +%F)
+          if [ "$$today" != "$$cleaned" ]; then python manage.py cleanup && cleaned=$$today; fi
+          if python manage.py generate_notifications; then sleep 3600; else sleep 300; fi
+        done
+    # Each clean run touches the heartbeat; unhealthy once no run has
+    # succeeded for two hours (or the first one hasn't yet).
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, sys, time; sys.exit(time.time() - os.path.getmtime(os.environ['SCHEDULER_HEARTBEAT_FILE']) > 7200)"
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     networks: [application]
     depends_on:
       db:

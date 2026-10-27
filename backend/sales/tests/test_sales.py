@@ -169,6 +169,22 @@ class CreditSaleTests(SalesAPITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("new_customer", response.data)
 
+    def test_phone_added_at_the_same_moment_is_a_400_not_a_500(self):
+        # Another request adds the phone after validation looked: only the
+        # database constraint sees it. Nothing of the sale is kept.
+        with tenant_context(self.business_a):
+            Customer.objects.create(name="Juma", phone="0712")
+        with mock.patch("sales.serializers._phone_taken", return_value=False):
+            sale = self.sell(amount_received="0", new_customer={"name": "Other", "phone": "0712"})
+            self.assertEqual(sale.status_code, 400)
+            self.assertIn("new_customer", sale.data)
+            customer = self.client.post(reverse("sales:customer-list"), {"name": "Other", "phone": "0712"}, format="json")
+            self.assertEqual(customer.status_code, 400)
+            self.assertIn("phone", customer.data)
+        with tenant_context(self.business_a):
+            self.assertEqual(Sale.objects.count(), 0)
+            self.assertEqual(Customer.objects.count(), 1)
+
     def test_customer_and_new_customer_together_is_refused(self):
         with tenant_context(self.business_a):
             customer = Customer.objects.create(name="Juma")

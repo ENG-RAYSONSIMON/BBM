@@ -1,6 +1,8 @@
 import hashlib
 import re
 from datetime import timedelta
+from smtplib import SMTPRecipientsRefused
+from unittest import mock
 
 from django.core import mail
 from django.core.cache import cache
@@ -26,9 +28,11 @@ class PasswordResetTests(APITestCase):
             email="owner@example.com", password=PASSWORD, business_name="Shop A"
         )
 
-    def request_reset(self, email="owner@example.com"):
+    def request_reset(self, email="owner@example.com", language="en"):
         with self.captureOnCommitCallbacks(execute=True):
-            return self.client.post(self.request_url, {"email": email}, format="json")
+            return self.client.post(
+                self.request_url, {"email": email}, format="json", HTTP_ACCEPT_LANGUAGE=language
+            )
 
     def raw_token_from_last_email(self):
         return re.search(r"#token=(\S+)", mail.outbox[-1].body).group(1)
@@ -53,6 +57,31 @@ class PasswordResetTests(APITestCase):
         self.assertEqual((known.status_code, known.data), (unknown.status_code, unknown.data))
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+
+    @override_settings(FRONTEND_URL="https://bbm.example.tz/")
+    def test_link_points_at_the_configured_site(self):
+        self.request_reset()
+        self.assertRegex(mail.outbox[0].body, r"https://bbm\.example\.tz/reset-password#token=\S+")
+
+    def test_email_follows_the_request_language(self):
+        self.request_reset(language="en")
+        self.request_reset(language="sw")
+        english, swahili = mail.outbox
+        self.assertEqual(english.subject, "Reset your Beauty Business Manager password")
+        self.assertEqual(swahili.subject, "Badilisha nenosiri lako la Beauty Business Manager")
+        self.assertIn("dakika 30", swahili.body)
+        self.assertIn("#token=", swahili.body)
+
+    def test_a_mail_failure_answers_the_same_and_is_logged(self):
+        refused = SMTPRecipientsRefused({"owner@example.com": (550, b"No such user")})
+        with mock.patch("accounts.services.send_mail", side_effect=refused):
+            with self.assertLogs("accounts.services", level="ERROR") as logs:
+                response = self.request_reset()
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.data, self.request_reset("nobody@example.com").data)
+        self.assertNotIn("owner@example.com", "\n".join(logs.output))
+        # The token was still issued: asking again sends a working link.
+        self.assertEqual(PasswordResetToken.objects.count(), 1)
 
     def test_inactive_user_gets_no_email(self):
         self.user.is_active = False

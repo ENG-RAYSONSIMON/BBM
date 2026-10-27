@@ -146,11 +146,11 @@ Errors not tied to a field (e.g. "This sale is already void.") come back as `non
 - [ ] No partial returns: a void cancels the whole sale.
 - [ ] No printable or WhatsApp receipt yet (FR-22 print formatting is Phase 5).
 - [ ] Customers can be added but not edited from the UI. The API supports PATCH.
-- [ ] Net profit (FR-16 second half) needs expenses (FR-15).
+- [x] ~~Net profit needs expenses.~~ Done with FR-15 in Phase 3 step 2.
 - [ ] `stock_on_hand` on the sale screen includes expired stock; the server refuses it at save time with a clear message.
 - [ ] The main JS chunk is still about 627 kB. Route splitting moved the pages out, but shared libraries dominate; vendor chunking is a separate task.
-- [ ] `QuerySet.update()` / `bulk_create()` on `Payment` bypass the append-only guard, the same as `StockMovement`.
-- [ ] Two simultaneous requests creating a customer with the same phone: the second gets a 500 (unique constraint) instead of a 400. Data stays consistent.
+- [x] ~~`QuerySet.update()` bypasses the append-only guard.~~ Closed: a Postgres trigger (`sales/0002_immutable_trigger`) refuses every UPDATE and DELETE on payments.
+- [x] ~~A same-phone race gave a 500.~~ Closed: the sale and the customer form both turn the constraint error into the usual 400.
 
 ---
 
@@ -302,5 +302,5 @@ Defined in `accounts/rbac.py` and data migration `accounts/0006_phase3_purchases
 - [ ] Only cash as an expense method.
 - [ ] Receipts are stored on the backend's local disk (`PRIVATE_MEDIA_ROOT`). Production needs private object storage, or a persistent volume and backups.
 - [ ] Expense categories can be added and deleted from the UI, but not renamed. The API supports PATCH.
-- [ ] Expense edits and deletes aren't audit-logged yet (FR-20, Phase 4).
+- [x] ~~Expense edits aren't audit-logged.~~ Done in Phase 4 step 1.
 

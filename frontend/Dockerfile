@@ -5,6 +5,8 @@ RUN npm ci
 COPY . .
 ARG VITE_API_URL=https://bbmapi.mauzo.tz/api/v1
 ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_APP_URL=https://bbm.mauzo.tz
+ENV VITE_APP_URL=$VITE_APP_URL
 RUN npm run build
 
 FROM nginx:stable-alpine

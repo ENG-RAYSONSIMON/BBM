@@ -17,6 +17,13 @@ if len(SECRET_KEY) < 50 or SECRET_KEY.startswith("REPLACE_ME"):  # noqa: F405
     raise ImproperlyConfigured("Set a unique production DJANGO_SECRET_KEY of at least 50 characters.")
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
     raise ImproperlyConfigured("Explicit production ALLOWED_HOSTS are required.")
+# Password-reset emails must really go out, with links to the real site.
+for name in ("FRONTEND_URL", "EMAIL_HOST", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD", "DEFAULT_FROM_EMAIL"):
+    value = env(name, default="").strip()
+    if not value or value.startswith("REPLACE_ME"):
+        raise ImproperlyConfigured(f"Set {name} in .env (it is empty or still REPLACE_ME).")
+if not FRONTEND_URL.startswith("https://"):
+    raise ImproperlyConfigured("FRONTEND_URL must be the https:// address of the site.")
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True

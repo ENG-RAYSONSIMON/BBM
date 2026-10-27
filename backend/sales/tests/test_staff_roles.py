@@ -13,6 +13,7 @@ from expenses.models import ExpenseCategory
 from .helpers import SALES_URL, SalesAPITestCase
 
 SUMMARY_URL = reverse("sales:summary")
+MY_SUMMARY_URL = reverse("sales:my-summary")
 PRODUCTS_URL = reverse("catalog:product-list")
 SALE_COST_FIELDS = {"cost_total", "gross_profit"}
 ITEM_COST_FIELDS = {"unit_cost", "line_cost"}
@@ -57,6 +58,25 @@ class StaffRoleTests(SalesAPITestCase):
         # Products are read-only for a seller.
         self.assertEqual(self.client.get(PRODUCTS_URL).status_code, 200)
         self.assertEqual(self.client.post(PRODUCTS_URL, {"name": "X"}, format="json").status_code, 403)
+
+    def test_seller_sees_their_own_day_without_profit(self):
+        self.credit_sale_by(self.seller)
+        self.credit_sale_by(self.seller)
+        self.credit_sale_by(self.seller_2)
+
+        self.as_user(self.seller, self.business_a)
+        mine = self.client.get(MY_SUMMARY_URL).data
+        self.assertEqual(mine["sales_count"], 2)
+        self.assertEqual(mine["revenue"], "24000.00")
+        self.assertEqual(mine["cash_collected"], "4000.00")
+        self.assertFalse({"cogs", "gross_profit", "net_profit"} & mine.keys())
+
+        # Another business sees none of it; without sales.view, no tile at all.
+        self.as_user(self.owner_b, self.business_b)
+        self.assertEqual(self.client.get(MY_SUMMARY_URL).data["sales_count"], 0)
+        nobody = make_member(self.business_a, "nobody@example.com", "Nobody")
+        self.as_user(nobody, self.business_a)
+        self.assertEqual(self.client.get(MY_SUMMARY_URL).status_code, 403)
 
     def test_cashier_sees_all_sales_and_takes_repayments(self):
         sale = self.credit_sale_by(self.seller)

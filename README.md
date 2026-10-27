@@ -7,7 +7,8 @@ profit reports.
 - Requirements: `docs/BBM_SRS_Summary_Draft.pdf`
 - Architecture rules and working conventions: `CLAUDE.md`
 - What each phase built: `docs/PHASE_1_SUMMARY.md`, `docs/PHASE_2_SUMMARY.md`,
-  `docs/PHASE_3_SUMMARY.md`
+  `docs/PHASE_3_SUMMARY.md`, `docs/PHASE_4_SUMMARY.md`
+- Production deployment: `docs/DEPLOYMENT.md`
 
 ---
 
@@ -23,8 +24,9 @@ profit reports.
   `core.managers.TenantManager`, activated only by
   `core.authentication.TenantJWTAuthentication`.
 - Password reset (FR-4): time-limited, single-use, hashed tokens sent by email
-  (console backend for now). The request endpoint answers the same way whether
-  or not the account exists. A completed reset ends all sessions.
+  (Mailpit in development, Brevo SMTP in production). The request endpoint
+  answers the same way whether or not the account exists. A completed reset
+  ends all sessions.
 - Table-driven permissions (FR-5): `Role → RolePermission → Permission`.
   `core.permissions.HasTenantPermission` is a default permission class; every
   authenticated view declares `required_permissions`. Owner and Admin differ
@@ -69,7 +71,7 @@ See `docs/PHASE_2_SUMMARY.md`.
   (FR-17) shows sales, gross and net profit, expenses, cash and credit for
   today, the last 7 days or this month.
 
-**In progress: Phase 4, Reporting, Notifications & Audit.** See
+**Done: Phase 4, Reporting, Notifications, Audit & Staff.** See
 `docs/PHASE_4_SUMMARY.md`.
 - Step 1 done (FR-20): an append-only audit log of deletes, settings and role
   changes, sale voids, purchase cancellations and expense edits, written in
@@ -90,17 +92,55 @@ See `docs/PHASE_2_SUMMARY.md`.
   products and stock, purchases and expenses, with costs and profit, but no
   deletes, voids, reports, settings or staff. See `docs/PHASE_4_SUMMARY.md`,
   step 4.
+- Gap fixes (committed in `21abce5`): profit, stock-value and expiry reports
+  need `finance.view`, and the expenses and profit reports need
+  `expenses.view`; staff name and phone can be edited; sellers get a "my sales
+  today" tile (`/sales/my-summary/`); stock is valued at what each batch cost.
+- Pre-production hardening (committed in `21abce5`): database triggers make
+  the audit log, stock movements and payments append-only even against raw
+  SQL; `manage.py cleanup` runs daily from the scheduler (expired tokens, old
+  notifications); the scheduler has a heartbeat healthcheck and `deploy.sh`
+  doesn't wait on it; a same-phone customer race answers 400, not 500.
+- Email (implemented, **not yet committed**): password-reset emails are sent
+  in the language the person used, and a mail failure is logged without
+  changing the answer. In development they land in Mailpit
+  (`http://localhost:8025`); in production they go out over Brevo SMTP. Links
+  in emails and staff login details point to where the app runs:
+  `http://localhost:5173` locally, `https://bbm.mauzo.tz` in production.
+  Production refuses to start while any email setting or `FRONTEND_URL` is
+  empty or `REPLACE_ME`.
+
+**In progress: first production deployment**  Follow `docs/DEPLOYMENT.md`.
+- [x] Brevo account created; `mauzo.tz` authenticated (DNS verification, DKIM,
+      SPF, DMARC).
+- [ ] Sender `no-reply@mauzo.tz` and SMTP key (Brevo: SMTP & API → SMTP).
+- [ ] `PRODUCTION_ENV` secret in the GitHub `staging` environment: the full
+      production `.env` without the two image lines, with fresh
+      `POSTGRES_PASSWORD` / `DJANGO_SECRET_KEY` and the Brevo values
+      (`EMAIL_HOST=smtp-relay.brevo.com`, port 587, TLS, the Brevo SMTP login
+      and key, `DEFAULT_FROM_EMAIL='Beauty Business Manager <no-reply@mauzo.tz>'`).
+      Keep a copy in a password manager: GitHub never shows it again.
+- [ ] DNS: `bbm.mauzo.tz` and `bbmapi.mauzo.tz` point to the VPS.
+- [ ] VPS: Docker and Dokploy's Traefik on `dokploy-network` (see the guide's
+      "Before deployment").
+- [ ] Other GitHub secrets (`VPS_HOST`, `VPS_USER`, `VPS_SSH_PRIVATE_KEY`,
+      `VPS_KNOWN_HOSTS`, `GHCR_USERNAME`, `GHCR_READ_TOKEN`) and the
+      `ENABLE_PRODUCTION_DEPLOY` repository variable.
+- [ ] Commit the email work, merge to `development` (that push deploys).
+- [ ] On the VPS: `docker compose exec backend python manage.py sendtestemail
+      you@example.com`, then a full reset on `https://bbm.mauzo.tz/forgot-password`
+      (check spam too), and `docker compose ps` shows every service healthy.
 
 **Languages: Kiswahili (default) and English.** A language button next to the
 theme button switches the whole app, including server error messages. See §7.
 
-**Open items:** `docs/PHASE_1_SUMMARY.md` §6–§8, `docs/PHASE_2_SUMMARY.md` and
-`docs/PHASE_3_SUMMARY.md` "Known gaps" (e.g. media served by Django in dev
-only; cash is the only payment method).
+**Open items:** the unticked "Known gaps" in `docs/PHASE_1_SUMMARY.md` to
+`docs/PHASE_4_SUMMARY.md` (e.g. cash is the only payment method; the reset
+email is sent inside the request; no screen to edit role permissions).
 
-**Next:** Phase 4 is complete. Phase 5 (loyalty, 2FA and printed receipts,
-real SMS/WhatsApp) or the open known gaps (other payment methods, a screen
-to edit role permissions, overselling override).
+**Next:** finish the first deployment (above). Then Phase 5 (loyalty, 2FA,
+printed receipts, real SMS/WhatsApp) or the open known gaps (other payment
+methods, partial returns, overselling override).
 
 Rules that still apply:
 - Every new tenant-owned model subclasses `core.models.TenantModel`; never
@@ -111,8 +151,8 @@ Rules that still apply:
   `save()` (see `catalog/models.py`).
 - Stock changes only through `inventory.services.record_movement()`.
 - Every authenticated view declares `required_permissions`. New codenames go in
-  `accounts/rbac.py` plus a data migration (copy the latest,
-  `accounts/0008_phase4_reports_permissions`).
+  `accounts/rbac.py` plus a data migration (copy
+  `accounts/0009_staff_roles_permissions`).
 - Every endpoint gets `@extend_schema`; `accounts.tests.test_schema` fails on
   any warning. Every detail endpoint gets a cross-tenant 404 test.
 - No hard-coded user-visible text: `_()` on the backend (then `makemessages` /
@@ -133,7 +173,7 @@ No local Python or Node is needed; everything runs in containers. (`backend/venv
 is gitignored if you keep one for editor tooling.)
 
 These host ports must be free: `5173` (frontend), `8000` (backend), `5433`
-(Postgres) and `6379` (Redis).
+(Postgres), `6379` (Redis) and `8025` (Mailpit, on 127.0.0.1 only).
 
 ## Stack in this repo today
 
@@ -143,12 +183,14 @@ These host ports must be free: `5173` (frontend), `8000` (backend), `5433`
 | `redis` | `redis:7` (throttle counters, via `REDIS_URL`) | `6379` |
 | `backend` | `./backend` (Python 3.12, Django 6.1, DRF, SimpleJWT, drf-spectacular), `runserver` with `./backend` mounted at `/app` | `8000` |
 | `frontend` | `node:24-alpine`, Vite dev server with `./frontend` mounted (`npm ci` on start) | `5173` |
+| `mailpit` | `axllent/mailpit` (catches every email the backend sends; web inbox) | `127.0.0.1:8025` |
 
 The frontend's `node_modules` lives in the named volume `frontend_node_modules`,
 not in `./frontend/node_modules` on your machine, so the Linux-built packages in
 the container never mix with anything you install locally.
 
-`nginx` isn't in `docker-compose.yml` yet.
+`docker-compose.yml` is for development only (runserver, Vite, Mailpit); nginx,
+gunicorn and the scheduler are in `compose.production.yml`.
 
 **Production:** [VPS deployment guide](docs/DEPLOYMENT.md) describes the separate
 `compose.production.yml`, GHCR images, and existing Dokploy Traefik routing for
@@ -194,13 +236,15 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 REDIS_URL=redis://redis:6379/0               # throttle counters; LocMem if unset
 
 # Optional (defaults shown). None of these are secrets.
-# FRONTEND_URL=http://localhost:5173        # base of the password-reset link
+# FRONTEND_URL=http://localhost:5173        # base of the password-reset link (production: https://bbm.mauzo.tz)
 # PASSWORD_RESET_TIMEOUT=1800               # reset token lifetime, seconds
 # PASSWORD_RESET_THROTTLE_RATE=5/hour       # per IP, both reset endpoints
+# NOTIFICATION_RETENTION_DAYS=90            # cleanup deletes resolved notifications older than this
+# SCHEDULER_HEARTBEAT_FILE=                 # set in production; empty turns the heartbeat off
 # LOGIN_THROTTLE_RATE=10/min                # per IP
 # REGISTER_THROTTLE_RATE=5/hour             # per IP
 # TOKEN_REFRESH_THROTTLE_RATE=30/min        # per IP
-# DEFAULT_FROM_EMAIL=no-reply@bbm.local
+# DEFAULT_FROM_EMAIL=no-reply@bbm.local     # sender shown in dev emails
 # PRODUCT_IMAGE_MAX_BYTES=2097152           # product image upload limit
 # EXPENSE_RECEIPT_MAX_BYTES=5242880         # expense receipt upload limit
 # PRIVATE_MEDIA_ROOT=/app/private_media     # receipts; never served at /media/
@@ -211,9 +255,11 @@ Notes:
   tools running on your machine (psql, DBeaver).
 - If the password contains URL-special characters (`@ : / # ?`), percent-encode
   them in `DATABASE_URL` (e.g. `@` → `%40`).
-- Email uses Django's console backend (`MAILERS` in `config/settings.py`), so
-  password-reset emails print in `docker compose logs backend`. When real SMTP
-  is added, its credentials go in `backend/.env` as `REPLACE_ME` placeholders.
+- Email: `docker-compose.yml` sets `EMAIL_HOST=mailpit` on the backend, so
+  every email lands in Mailpit at `http://localhost:8025`. Without
+  `EMAIL_HOST` (e.g. running Django outside Compose) emails print in the
+  backend logs. Don't put real SMTP credentials in `backend/.env`; the real
+  ones (Brevo) only live in the production `PRODUCTION_ENV` secret.
 - To generate a secret key:
   `docker compose run --rm backend python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"`
 - `CORS_ALLOWED_ORIGINS` must contain the exact origin the browser loads the
@@ -232,11 +278,11 @@ browser calls that URL, so it uses the host port, not `backend:8000`.
 
 1. Create and fill in the env files (§1).
 
-2. Build and start all four services (db, redis, backend, frontend):
+2. Build and start all five services (db, redis, backend, frontend, mailpit):
 
    ```bash
    docker compose up -d --build
-   docker compose ps                   # db, redis, backend and frontend should all be "Up"
+   docker compose ps                   # db, redis, backend, frontend and mailpit should all be "Up"
    ```
 
 3. Wait for the frontend to be ready. The first start runs `npm ci` inside the
@@ -267,6 +313,7 @@ browser calls that URL, so it uses the host port, not `backend:8000`.
 | http://localhost:8000/api/v1/ | REST API |
 | http://localhost:8000/admin/ | Django admin (needs a superuser, §3) |
 | http://localhost:8000/api/docs/ | Swagger UI (`DEBUG=True` only, §6) |
+| http://localhost:8025 | Mailpit: the emails the app sent (password resets) |
 
 ### Day to day
 
@@ -319,8 +366,11 @@ docker compose down -v              # also DELETES the volumes: the database (al
   6379. Stop it, or change the left side of that port mapping in
   `docker-compose.yml`. If you change the backend port, also update
   `VITE_API_URL`.
-- **Password-reset email.** It isn't sent; the link is printed in
-  `docker compose logs backend`.
+- **Password-reset email.** Nothing leaves your machine: the `mailpit`
+  service catches every email and shows it at `http://localhost:8025`. Click
+  the link there; it opens `http://localhost:5173/reset-password#token=…`
+  (`FRONTEND_URL` in `backend/.env`). Running the backend without
+  `EMAIL_HOST` prints emails to `docker compose logs backend` instead.
 
 ## 3. Migrations and an admin user
 
@@ -352,7 +402,7 @@ default permissions.
 ## 4. Run the tests
 
 ```bash
-docker compose exec backend python manage.py test            # whole suite (282 tests)
+docker compose exec backend python manage.py test            # whole suite (299 tests)
 docker compose exec backend python manage.py test -v 2       # list each test
 docker compose exec backend python manage.py test core       # tenant-scoping tests
 docker compose exec backend python manage.py test accounts   # registration, auth, password reset, permissions
@@ -371,7 +421,7 @@ docker compose exec backend python manage.py check
 Frontend, inside the running `frontend` container:
 
 ```bash
-docker compose exec frontend npm test         # Vitest (110 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, staff, languages
+docker compose exec frontend npm test         # Vitest (113 tests): API client, auth pages, app shell, products, stock dialog, sale screen, sales, purchases, expenses, dashboard, audit log, reports, notifications, staff, languages
 docker compose exec frontend npm run lint     # oxlint
 docker compose exec frontend npm run build    # type-check + production build (writes frontend/dist)
 ```
@@ -417,7 +467,7 @@ curl -s -X PATCH localhost:8000/api/v1/settings/ \
   -d '{"low_stock_threshold":10,"tax_rate":"18.00"}' | jq
 
 # Password reset, step 1 (always 202, whether or not the email exists).
-# The link prints in `docker compose logs backend`: .../reset-password#token=<token>
+# The email lands in Mailpit (http://localhost:8025): .../reset-password#token=<token>
 curl -s -X POST localhost:8000/api/v1/auth/password-reset/ \
   -H 'Content-Type: application/json' -d '{"email":"owner@example.com"}' | jq
 
@@ -436,7 +486,7 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | GET | `/api/v1/auth/me/` | Bearer | any member (also returns your `permissions`) |
 | POST | `/api/v1/auth/change-password/` | Bearer, 10/min per IP | any member (the only call allowed on a temporary password, with me/logout) |
 | GET/POST | `/api/v1/staff/` | Bearer | `staff.manage` |
-| GET/PATCH | `/api/v1/staff/{id}/` | Bearer | `staff.manage` (role, `is_active`; not yourself or the Owner) |
+| GET/PATCH | `/api/v1/staff/{id}/` | Bearer | `staff.manage` (name, phone, role, `is_active`; not yourself or the Owner) |
 | POST | `/api/v1/staff/{id}/reset-password/` | Bearer | `staff.manage` |
 | GET | `/api/v1/roles/` | Bearer | `staff.manage` (`assignable` = roles you may give) |
 | POST | `/api/v1/auth/password-reset/` | none, 5/hour per IP | — |
@@ -449,6 +499,7 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | POST | `/api/v1/sales/{id}/payments/` | Bearer | `payments.create` |
 | POST | `/api/v1/sales/{id}/void/` | Bearer | `sales.void` (Owner) |
 | GET | `/api/v1/sales/summary/` | Bearer | `sales.view` + `sales.view_all` (profit only with `finance.view`) |
+| GET | `/api/v1/sales/my-summary/` | Bearer | `sales.view` (your own sales and cash today; no profit) |
 | GET/POST/PATCH/DELETE | `/api/v1/customers/` … | Bearer | view / `sales.create` / `sales.void` to delete |
 | GET/POST, GET/PUT | `/api/v1/purchases/`, `/api/v1/purchases/{id}/` | Bearer | `purchases.view` / `purchases.manage` |
 | POST | `/api/v1/purchases/{id}/receive/`, `…/cancel/` | Bearer | `purchases.manage` |
@@ -457,8 +508,11 @@ curl -s -X POST localhost:8000/api/v1/auth/password-reset/confirm/ \
 | GET | `/api/v1/expenses/summary/` | Bearer | `expenses.view` |
 | GET/POST/PATCH/DELETE | `/api/v1/expense-categories/` … | Bearer | `expenses.view` / `expenses.manage` / `expenses.delete` |
 | GET | `/api/v1/audit-logs/`, `/api/v1/audit-logs/{id}/` | Bearer | `audit.view` (Owner) |
-| GET | `/api/v1/reports/{sales,profit,expenses,stock-valuation,expiry}/` | Bearer | `reports.view` |
-| GET | `/api/v1/reports/{…}/export/` (CSV) | Bearer | `reports.export` |
+| GET | `/api/v1/reports/sales/` | Bearer | `reports.view` (cost and profit only with `finance.view`) |
+| GET | `/api/v1/reports/expenses/` | Bearer | `reports.view` + `expenses.view` |
+| GET | `/api/v1/reports/profit/` | Bearer | `reports.view` + `finance.view` + `expenses.view` |
+| GET | `/api/v1/reports/{stock-valuation,expiry}/` | Bearer | `reports.view` + `finance.view` |
+| GET | `/api/v1/reports/{…}/export/` (CSV) | Bearer | that report's permissions + `reports.export` |
 | GET | `/api/v1/notifications/`, `…/{id}/`, `…/unread-count/` | Bearer | any member (each alert needs its permission) |
 | POST | `/api/v1/notifications/{id}/read/`, `…/read-all/` | Bearer | any member |
 
@@ -556,7 +610,10 @@ docker compose exec backend python manage.py spectacular --validate --fail-on-wa
 
 ```
 BBM/
-├── docker-compose.yml        # db, redis, backend, frontend
+├── docker-compose.yml        # development: db, redis, backend, frontend, mailpit
+├── compose.production.yml    # production: db, redis, backend, scheduler, nginx
+├── .github/workflows/        # CI: checks, image publishing, optional deploy
+├── deploy/                   # deploy.sh, upload.sh, render_env.py (+ tests), .env.example
 ├── CLAUDE.md                 # architecture rules + working conventions (for Claude Code)
 ├── .claude/                  # Claude Code setup: rules/, skills/, agents/, settings.json
 ├── .env                      # compose vars (gitignored; see .env.example)
@@ -564,7 +621,9 @@ BBM/
 │   ├── BBM_SRS_Summary_Draft.pdf
 │   ├── PHASE_1_SUMMARY.md
 │   ├── PHASE_2_SUMMARY.md
-│   └── PHASE_3_SUMMARY.md
+│   ├── PHASE_3_SUMMARY.md
+│   ├── PHASE_4_SUMMARY.md
+│   └── DEPLOYMENT.md
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -573,7 +632,8 @@ BBM/
 │   ├── locale/sw/            # Kiswahili server messages (django.po / django.mo)
 │   ├── core/                 # tenancy: TenantModel, TenantManager, tenant context,
 │   │                         #   TenantJWTAuthentication, HasTenantPermission,
-│   │                         #   OpenAPI schema hooks (schema.py), middleware, admin base
+│   │                         #   OpenAPI schema hooks (schema.py), middleware, admin base,
+│   │                         #   `cleanup` command, scheduler heartbeat
 │   ├── accounts/             # User, Business, Role, UserRole, BusinessSettings,
 │   │                         #   Permission, RolePermission, PasswordResetToken;
 │   │                         #   rbac.py (permission catalog + role defaults);
@@ -590,6 +650,9 @@ BBM/
 │   │                         #   receive_purchase, cancel_purchase)
 │   ├── expenses/             # ExpenseCategory, Expense; receipt validation and
 │   │                         #   download, expense totals
+│   ├── audit/                # AuditLog (append-only, DB trigger), record()
+│   ├── reports/              # FR-18 reports and CSV export (no models)
+│   ├── notifications/        # Notification, NotificationRead; generate_notifications
 │   ├── media/                # product images, dev only (gitignored)
 │   └── private_media/        # expense receipts, served only by the API (gitignored)
 └── frontend/
@@ -601,7 +664,8 @@ BBM/
     ├── src/pages/            # auth pages, dashboard, settings, products (list, detail,
     │                         #   form), inventory alerts, catalog setup, sale screen (pos),
     │                         #   sales + receipt, customers, purchases (list, form,
-    │                         #   detail), expenses
+    │                         #   detail), expenses, reports, audit log, notifications,
+    │                         #   staff
     ├── src/components/       # layout (app shell, auth layout), shadcn/ui in ui/
     ├── src/routes/guards.tsx # RequireAuth / RedirectIfAuthed
     └── src/test/             # Vitest setup, mockFetch, render helpers, fixtures

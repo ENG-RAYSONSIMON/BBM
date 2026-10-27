@@ -42,6 +42,10 @@ const KEY = {
   expiry: 'expiry',
 } as const satisfies Record<ReportKind, string>
 const EXPIRY_WINDOWS = ['30', '60', '90'] as const
+// All about buying cost or profit, so shown only with finance.view.
+const FINANCE_REPORTS: readonly ReportKind[] = ['profit', 'stock-valuation', 'expiry']
+// Show spending, so shown only with expenses.view.
+const EXPENSE_REPORTS: readonly ReportKind[] = ['profit', 'expenses']
 
 type AnyReport = SalesReport | ProfitReport | ExpensesReport | StockValuationReport | ExpiryReport
 
@@ -50,7 +54,12 @@ export function ReportsPage() {
   const { can } = useAuth()
   const { t } = useTranslation()
   const list = useListParams()
-  const kind = (REPORTS as readonly string[]).includes(list.get('report')) ? (list.get('report') as ReportKind) : 'sales'
+  const reports = REPORTS.filter(
+    (r) =>
+      (can(PERMISSIONS.financeView) || !FINANCE_REPORTS.includes(r)) &&
+      (can(PERMISSIONS.expensesView) || !EXPENSE_REPORTS.includes(r)),
+  )
+  const kind = (reports as readonly string[]).includes(list.get('report')) ? (list.get('report') as ReportKind) : 'sales'
   const byPeriod = kind === 'sales' || kind === 'profit' || kind === 'expenses'
   const period = (REPORT_PERIODS as readonly string[]).includes(list.get('period'))
     ? (list.get('period') as ReportPeriod)
@@ -101,7 +110,7 @@ export function ReportsPage() {
       <PageHeader title={t('reports.title')} description={t('reports.subtitle')} actions={downloadButton} />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label={t('reports.choose')}>
-        {REPORTS.map((r) => (
+        {reports.map((r) => (
           <Button
             key={r}
             size="sm"
@@ -204,26 +213,37 @@ function RangeNote({ from, to }: { from: string; to: string }) {
 }
 
 function SalesView({ report }: { report: SalesReport }) {
+  const { can } = useAuth()
   const { t } = useTranslation()
   const label = usePeriodLabel(report.period)
-  const columns: Column<SalesReport['rows'][number]>[] = [
+  const showProfit = can(PERMISSIONS.financeView)
+  type Row = SalesReport['rows'][number]
+  const profitColumns: Column<Row>[] = [
+    { header: t('reports.col_cogs'), cell: (r) => formatTZS(r.cogs ?? '0'), className: 'text-right tabular-nums' },
+    { header: t('reports.col_grossProfit'), cell: (r) => formatTZS(r.gross_profit ?? '0'), className: 'text-right tabular-nums' },
+  ]
+  const columns: Column<Row>[] = [
     { header: t('reports.col_period'), cell: (r) => label(r.period) },
     { header: t('reports.col_sales'), cell: (r) => r.sales_count, className: 'text-right tabular-nums' },
     { header: t('reports.col_revenue'), cell: (r) => formatTZS(r.revenue), className: 'text-right tabular-nums' },
-    { header: t('reports.col_cogs'), cell: (r) => formatTZS(r.cogs), className: 'text-right tabular-nums' },
-    { header: t('reports.col_grossProfit'), cell: (r) => formatTZS(r.gross_profit), className: 'text-right tabular-nums' },
+    ...(showProfit ? profitColumns : []),
     { header: t('reports.col_cash'), cell: (r) => formatTZS(r.cash_collected), className: 'text-right tabular-nums' },
   ]
+  const tiles: [string, string, string?][] = [
+    [t('reports.col_revenue'), formatTZS(report.totals.revenue), t('reports.salesCount', { count: report.totals.sales_count })],
+  ]
+  if (showProfit) {
+    tiles.push([
+      t('reports.col_grossProfit'),
+      formatTZS(report.totals.gross_profit ?? '0'),
+      t('reports.costHint', { cogs: formatTZS(report.totals.cogs ?? '0') }),
+    ])
+  }
+  tiles.push([t('reports.col_cash'), formatTZS(report.totals.cash_collected)])
   return (
     <>
       <RangeNote from={report.date_from} to={report.date_to} />
-      <Tiles
-        items={[
-          [t('reports.col_revenue'), formatTZS(report.totals.revenue), t('reports.salesCount', { count: report.totals.sales_count })],
-          [t('reports.col_grossProfit'), formatTZS(report.totals.gross_profit), t('reports.costHint', { cogs: formatTZS(report.totals.cogs) })],
-          [t('reports.col_cash'), formatTZS(report.totals.cash_collected)],
-        ]}
-      />
+      <Tiles items={tiles} />
       <PeriodChart title={t('reports.col_revenue')} data={report.rows.map((r) => ({ label: label(r.period), value: Number(r.revenue) }))} />
       <ReportTable label={t('reports.kind_sales')} columns={columns} rows={report.rows} rowKey={(r) => r.period} />
     </>

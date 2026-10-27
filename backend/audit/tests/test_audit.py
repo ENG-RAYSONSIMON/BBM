@@ -1,7 +1,7 @@
 """FR-20: sensitive actions are logged in the same transaction, entries are
 append-only, and only the Owner can read them."""
 
-from django.db import transaction
+from django.db import DatabaseError, connection, transaction
 from django.urls import reverse
 
 from accounts.models import Role, User, UserRole
@@ -165,6 +165,20 @@ class ImmutabilityTests(TenantAPITestCase):
                     manager.update(target_label="edited")
                 with self.assertRaises(AuditLogImmutable):
                     manager.bulk_update([entry], ["target_label"])
+            self.assertEqual(AuditLog.objects.get().target_label, "")
+
+    def test_raw_sql_cannot_change_or_delete_entries(self):
+        # The database trigger is the last line: it holds even past the ORM.
+        with tenant_context(self.business_a):
+            entry = AuditLog.objects.create(action=AuditLog.Action.EXPORT)
+        for sql in (
+            "UPDATE audit_auditlog SET target_label = 'edited' WHERE id = %s",
+            "DELETE FROM audit_auditlog WHERE id = %s",
+        ):
+            with self.subTest(sql), self.assertRaises(DatabaseError), transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, [entry.pk])
+        with tenant_context(self.business_a):
             self.assertEqual(AuditLog.objects.get().target_label, "")
 
 

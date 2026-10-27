@@ -51,7 +51,7 @@ PERMISSIONS = {
     EXPENSES_MANAGE: "Record and edit expenses and their receipts, and manage expense categories.",
     EXPENSES_DELETE: "Delete expenses and expense categories.",
     AUDIT_VIEW: "View the audit log of sensitive actions.",
-    REPORTS_VIEW: "View sales, profit, expense, stock-valuation and expiry reports.",
+    REPORTS_VIEW: "View reports: sales; expenses also need expenses.view; profit needs finance.view and expenses.view; stock-valuation and expiry need finance.view.",
     REPORTS_EXPORT: "Download reports as CSV.",
     SALES_VIEW_ALL: "View everyone's sales and the sales totals.",
     PAYMENTS_CREATE: "Record customer payments towards credit sales.",
