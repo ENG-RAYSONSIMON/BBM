@@ -18,7 +18,7 @@ class ProductionSettingsTests(SimpleTestCase):
             "REDIS_URL": "redis://redis:6379/0",
             "EMAIL_HOST": "smtp.example.com",
             "EMAIL_HOST_USER": "test",
-            "EMAIL_HOST_PASSWORD": "REPLACE_ME-test-only",
+            "EMAIL_HOST_PASSWORD": "test-only-password",
             "EMAIL_USE_TLS": "True",
             "EMAIL_USE_SSL": "False",
             "DEFAULT_FROM_EMAIL": "test@example.com",
@@ -57,6 +57,10 @@ assert connection.use_tls and not connection.use_ssl
             ({"DJANGO_SECRET_KEY": "REPLACE_ME"}, "unique production DJANGO_SECRET_KEY"),
             ({"ALLOWED_HOSTS": "*"}, "Explicit production ALLOWED_HOSTS"),
             ({"EMAIL_USE_SSL": "True"}, "Choose EMAIL_USE_TLS or EMAIL_USE_SSL"),
+            ({"EMAIL_HOST_PASSWORD": "REPLACE_ME"}, "Set EMAIL_HOST_PASSWORD in .env"),
+            ({"EMAIL_HOST": ""}, "Set EMAIL_HOST in .env"),
+            ({"DEFAULT_FROM_EMAIL": "REPLACE_ME"}, "Set DEFAULT_FROM_EMAIL in .env"),
+            ({"FRONTEND_URL": "http://localhost:5173"}, "FRONTEND_URL must be the https://"),
         ]:
             with self.subTest(overrides=overrides):
                 result = self.run_settings(

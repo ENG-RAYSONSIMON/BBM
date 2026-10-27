@@ -122,8 +122,8 @@ describe('StaffPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add staff' }))
     expect(await within(dialog).findByText('Staff member added')).toBeInTheDocument()
     expect(within(dialog).getByText(new RegExp(`Temporary password: ${password}`))).toBeInTheDocument()
-    // The live site's address, not wherever this page happens to run.
-    expect(within(dialog).getByText(/https:\/\/bbm\.mauzo\.tz/)).toBeInTheDocument()
+    // Where this app runs (production images fix it to the live site at build time).
+    expect(within(dialog).getByText(/Login for/).textContent).toContain(`\n${window.location.origin}\n`)
     expect(within(dialog).getByRole('button', { name: 'Copy login details' })).toBeInTheDocument()
 
     const body = JSON.parse(String(fetchMock.calls.filter((c) => c.key === 'POST /staff/')[1].init.body))

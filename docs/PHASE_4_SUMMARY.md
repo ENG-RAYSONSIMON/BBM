@@ -231,7 +231,8 @@ Ids are membership (`UserRole`) ids, so another business's staff are 404. Each a
 # Gap fixes and production URLs (2026-10-27)
 
 Status: implemented, not yet committed.
-- Backend: 296 tests (282 before, 14 new). Frontend: 113 Vitest tests (3 new). The schema validates with `--fail-on-warn`.
+- Backend: 299 tests (282 before, 17 new). Frontend: 113 Vitest tests (3 new). The schema validates with `--fail-on-warn`.
 - Closed the gaps marked [x] above: the audit trigger, staff name/phone edits, the seller's tile, `finance.view` on reports, and stock valued at batch cost.
 - Pre-production hardening: DB triggers make stock movements and payments append-only at the database too; `manage.py cleanup` runs daily from the scheduler; the scheduler has a heartbeat healthcheck; the expenses and profit reports need `expenses.view`; a same-phone customer race is a 400.
-- Links people are sent use the live address even in development: `FRONTEND_URL` (password-reset links) and the new `VITE_APP_URL` (staff login details), both `https://bbm.mauzo.tz`. Set in `.env.example`, `docker-compose.yml`, the frontend `Dockerfile` and the image workflow.
+- Password-reset email: translated (en/sw), sent to Mailpit in development and over SMTP in production; a mail failure is logged (error type only) and the answer stays the same 202. Links follow the environment (`FRONTEND_URL`; staff login details use the app's own address, fixed to `https://bbm.mauzo.tz` in production images).
+- [ ] Known gap: the reset email is still sent inside the request, so a request for an existing account takes longer (up to the 15 s SMTP timeout) than for an unknown one. Moving the send to a background job closes this.

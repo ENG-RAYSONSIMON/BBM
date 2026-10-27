@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BBM\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-27 08:29+0300\n"
+"POT-Creation-Date: 2026-10-27 09:43+0300\n"
 "Language: sw\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -42,39 +42,60 @@ msgstr "Akaunti hii ina biashara zaidi ya moja; chagua moja."
 msgid "Token is invalid or expired."
 msgstr "Kiungo si sahihi au muda wake umeisha."
 
-#: accounts/services.py:211
+#: accounts/services.py:159
+msgid "Reset your Beauty Business Manager password"
+msgstr "Badilisha nenosiri lako la Beauty Business Manager"
+
+#: accounts/services.py:161
+#, python-format
+msgid ""
+"We received a request to reset your password.\n"
+"\n"
+"Open this link within %(minutes)s minutes to choose a new one:\n"
+"%(link)s\n"
+"\n"
+"If you did not ask for this, you can ignore this email."
+msgstr ""
+"Tumepokea ombi la kubadilisha nenosiri lako.\n"
+"\n"
+"Fungua kiungo hiki ndani ya dakika %(minutes)s uchague nenosiri jipya:\n"
+"%(link)s\n"
+"\n"
+"Kama hukuomba hili, puuza barua pepe hii."
+
+#: accounts/services.py:222
 msgid "Your current password is wrong."
 msgstr "Nenosiri lako la sasa si sahihi."
 
-#: accounts/services.py:217
+#: accounts/services.py:228
 msgid "Choose a password different from the current one."
 msgstr "Chagua nenosiri tofauti na la sasa."
 
-#: accounts/services.py:257
+#: accounts/services.py:268
 msgid "You can't give this role."
 msgstr "Huwezi kutoa nafasi hii."
 
-#: accounts/services.py:263
+#: accounts/services.py:274
 msgid "This account can't be changed here."
 msgstr "Akaunti hii haiwezi kubadilishwa hapa."
 
-#: accounts/services.py:265
+#: accounts/services.py:276
 msgid "You can't change your own access."
 msgstr "Huwezi kubadilisha ruhusa zako mwenyewe."
 
-#: accounts/services.py:268
+#: accounts/services.py:279
 msgid "You can't change this person: their role is not below yours."
 msgstr "Huwezi kumbadilisha mtu huyu: nafasi yake si chini ya yako."
 
-#: accounts/services.py:283
+#: accounts/services.py:294
 msgid "Enter a temporary password."
 msgstr "Weka nenosiri la muda."
 
-#: accounts/services.py:305
+#: accounts/services.py:316
 msgid "This email already has an account. Use a different email."
 msgstr "Barua pepe hii tayari ina akaunti. Tumia barua pepe nyingine."
 
-#: accounts/services.py:345
+#: accounts/services.py:356
 msgid ""
 "This person also uses their account at another business, so their name and "
 "phone can't be changed here."
@@ -82,7 +103,7 @@ msgstr ""
 "Mtu huyu anatumia akaunti yake kwenye biashara nyingine pia, kwa hiyo jina "
 "na simu yake haviwezi kubadilishwa hapa."
 
-#: accounts/services.py:374
+#: accounts/services.py:385
 msgid ""
 "This person also uses their account at another business. Ask them to use "
 "“Forgot password” instead."
@@ -280,7 +301,7 @@ msgstr "Kitendo \"{method}\" hakiruhusiwi."
 msgid "Malformed request."
 msgstr "Ombi lina makosa."
 
-#: core/library_messages.py:41 sales/tests/test_i18n.py:72
+#: core/library_messages.py:41
 msgid "Request was throttled."
 msgstr "Umejaribu mara nyingi sana."
 
@@ -575,15 +596,15 @@ msgstr "Tarehe ya kuisha muda"
 msgid "Days left"
 msgstr "Siku zilizobaki"
 
-#: sales/serializers.py:46
+#: sales/serializers.py:47 sales/serializers.py:57
 msgid "A customer with this phone number already exists."
 msgstr "Tayari kuna mteja mwenye namba hii ya simu."
 
-#: sales/serializers.py:58
+#: sales/serializers.py:68 sales/services.py:282
 msgid "A customer with this phone number already exists. Choose them instead."
 msgstr "Tayari kuna mteja mwenye namba hii ya simu. Mchague yeye."
 
-#: sales/serializers.py:92
+#: sales/serializers.py:102
 msgid "Choose an existing customer or enter a new one, not both."
 msgstr "Chagua mteja aliyepo au weka mpya, si vyote viwili."
 
@@ -623,23 +644,23 @@ msgstr ""
 msgid "%(name)s: only %(count)s available to sell."
 msgstr "%(name)s: zimebaki %(count)s tu za kuuza."
 
-#: sales/services.py:339
+#: sales/services.py:346
 msgid "This sale is void."
 msgstr "Mauzo haya yamebatilishwa."
 
-#: sales/services.py:341
+#: sales/services.py:348
 msgid "Nothing is owed on this sale."
 msgstr "Hakuna deni kwenye mauzo haya."
 
-#: sales/services.py:343
+#: sales/services.py:350
 msgid "Enter the cash received."
 msgstr "Weka pesa uliyopokea."
 
-#: sales/services.py:362
+#: sales/services.py:369
 msgid "Say why the sale is being voided."
 msgstr "Eleza kwa nini unabatilisha mauzo haya."
 
-#: sales/services.py:365 sales/tests/test_i18n.py:71
+#: sales/services.py:372
 msgid "This sale is already void."
 msgstr "Mauzo haya yameshabatilishwa."
 

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import timedelta
 
@@ -8,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.utils import translation
 from django.utils.translation import gettext as _
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
@@ -25,6 +27,8 @@ from .models import (
     UserRole,
 )
 from .rbac import DEFAULT_ROLE_PERMISSIONS
+
+logger = logging.getLogger(__name__)
 
 
 def get_active_membership(user_id, business_id):
@@ -139,23 +143,31 @@ def request_password_reset(email):
             token_hash=_hash_reset_token(raw_token),
             expires_at=now + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT),
         )
-        transaction.on_commit(lambda: _send_reset_email(user, raw_token))
+        # In the language the request came in (the app sends Accept-Language).
+        language = translation.get_language()
+        transaction.on_commit(lambda: _send_reset_email(user, raw_token, language))
 
 
-def _send_reset_email(user, raw_token):
+def _send_reset_email(user, raw_token, language):
+    """Send the reset link. A mail failure is logged, never raised: the
+    response must stay the same 202 whether or not the account exists, and
+    the token stays valid, so the person can simply ask again."""
     # Fragment, not query string: keeps the token out of server logs and Referer.
     link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password#token={raw_token}"
     minutes = settings.PASSWORD_RESET_TIMEOUT // 60
-    send_mail(
-        subject="Reset your Beauty Business Manager password",
-        message=(
+    with translation.override(language):
+        subject = _("Reset your Beauty Business Manager password")
+        message = _(
             "We received a request to reset your password.\n\n"
-            f"Open this link within {minutes} minutes to choose a new one:\n{link}\n\n"
+            "Open this link within %(minutes)s minutes to choose a new one:\n%(link)s\n\n"
             "If you did not ask for this, you can ignore this email."
-        ),
-        from_email=None,
-        recipient_list=[user.email],
-    )
+        ) % {"minutes": minutes, "link": link}
+    try:
+        send_mail(subject=subject, message=message, from_email=None, recipient_list=[user.email])
+    except Exception as exc:
+        # Only the error type, not its text or traceback: SMTP errors can carry
+        # the recipient's address. The user id is enough to look into it.
+        logger.error("Password reset email failed for user %s (%s).", user.pk, type(exc).__name__)
 
 
 @transaction.atomic
